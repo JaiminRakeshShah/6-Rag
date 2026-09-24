@@ -1,8 +1,9 @@
 """Permanent Chroma store for embeddings, plus a SQLite copy of the chunk text.
 
 Chroma holds each embedding. ``data/chunks.sqlite`` holds the same chunks in
-ordinary tables: ``documents`` and ``chunks``, including ``chunks.body``. A
-later BM25 index can be FTS5 over that body. This module does not build one.
+ordinary tables: ``documents`` and ``chunks``, including ``chunks.body``.
+``chunks_fts`` is an FTS5 index of that body, rebuilt on each replace, and
+``bm25_scores`` reads it.
 
 Chroma rejects null metadata, so empty fields are omitted there. SQLite stores
 those fields as NULL. ``page_no`` stays null. ``parent_id`` is the section id
@@ -241,6 +242,59 @@ def replace_index(client: ClientAPI, records: Sequence[ChunkRecord], model_id: s
     _replace_sql(_sql_path(client), records, model_id)
 
 
+def bm25_scores(client: ClientAPI, query: str) -> dict[str, float]:
+    """Score ``query`` against chunk bodies with FTS5 BM25.
+
+    The result maps ``chunk_id`` to a higher-is-better score. FTS5's ``bm25()``
+    is negative and lower is better, so the value stored here is ``-bm25()``.
+    Alphanumeric tokens are stemmed and combined with OR. A query with none
+    matches nothing. Chunks that do not match are absent.
+    """
+    match = _fts_match(query)
+    path = _sql_path(client)
+    if match is None or not path.exists():
+        return {}
+    connection = sqlite3.connect(path)
+    try:
+        created = _ensure_fts(connection, rebuild=False)
+        if created:
+            connection.commit()
+        rows = connection.execute(
+            """
+            SELECT c.chunk_id, -bm25(chunks_fts) AS score
+            FROM chunks_fts
+            JOIN chunks AS c ON c.rowid = chunks_fts.rowid
+            WHERE chunks_fts MATCH ?
+            """,
+            (match,),
+        ).fetchall()
+    finally:
+        connection.close()
+    return {str(chunk_id): float(score) for chunk_id, score in rows}
+
+
+def get_chunks(client: ClientAPI, chunk_ids: Sequence[str]) -> list[SearchHit]:
+    """Return stored chunks for ``chunk_ids``.
+
+    ``distance`` is 0. This read is not a neighbor query, so that field is
+    not a rank.
+    """
+    if not chunk_ids:
+        return []
+    collection = _open_collection(client)
+    if collection is None:
+        return []
+    found = collection.get(ids=list(chunk_ids), include=["documents", "metadatas"])
+    documents = found["documents"] or []
+    metadatas = found["metadatas"] or []
+    hits: list[SearchHit] = []
+    for chunk_id, document, metadata in zip(found["ids"], documents, metadatas, strict=True):
+        if document is None or metadata is None:
+            continue
+        hits.append(_hit(chunk_id, document, metadata, 0.0))
+    return hits
+
+
 def search(client: ClientAPI, vector: Sequence[float], k: int = 5) -> list[SearchHit]:
     """Return the ``k`` nearest chunks by cosine distance."""
     if k < 1:
@@ -438,8 +492,53 @@ def _replace_sql(path: Path, records: Sequence[ChunkRecord], model_id: str) -> N
                     "INSERT INTO index_meta (key, value) VALUES (?, ?)",
                     (("model_id", model_id), ("dimension", str(len(records[0].vector)))),
                 )
+            _ensure_fts(connection, rebuild=True)
     finally:
         connection.close()
+
+
+_FTS_TERM = re.compile(r"[A-Za-z0-9]+")
+
+
+def _fts_match(query: str) -> str | None:
+    """Build an FTS5 OR query from the alphanumeric tokens in ``query``."""
+    terms: list[str] = []
+    seen: set[str] = set()
+    for term in _FTS_TERM.findall(query.lower()):
+        if term in seen:
+            continue
+        seen.add(term)
+        terms.append(term)
+    if not terms:
+        return None
+    return " OR ".join(f'"{term}"' for term in terms)
+
+
+def _ensure_fts(connection: sqlite3.Connection, *, rebuild: bool) -> bool:
+    """Create ``chunks_fts`` when missing, and rebuild it when asked.
+
+    Returns True when the index was rebuilt. An old database has the chunk
+    rows but no FTS table; the first lexical query builds it from those rows.
+    """
+    found = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'chunks_fts'"
+    ).fetchone()
+    if found is None:
+        connection.execute(
+            """
+            CREATE VIRTUAL TABLE chunks_fts USING fts5(
+                body,
+                content='chunks',
+                content_rowid='rowid',
+                tokenize='porter unicode61'
+            )
+            """
+        )
+        rebuild = True
+    if not rebuild:
+        return False
+    connection.execute("INSERT INTO chunks_fts(chunks_fts) VALUES ('rebuild')")
+    return True
 
 
 def _ensure_sql(connection: sqlite3.Connection) -> None:
