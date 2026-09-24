@@ -33,6 +33,7 @@ def line_break_hyphens(pdf_path: Path) -> list[tuple[str, str]]:
 
 
 def restore_line_break_hyphens(markdown: str, pdf_path: Path) -> str:
+    """Put back hyphens that the PDF split across two lines, such as third-party."""
     for joined, hyphenated in line_break_hyphens(pdf_path):
         markdown = re.sub(
             rf"\b{re.escape(joined)}\b",
@@ -43,6 +44,7 @@ def restore_line_break_hyphens(markdown: str, pdf_path: Path) -> str:
 
 
 def drop_stray_bullets(markdown: str) -> str:
+    """Remove leftover bullet characters from lines that are already list items."""
     cleaned: list[str] = []
     for line in markdown.splitlines():
         match = _LIST_ITEM.match(line)
@@ -55,10 +57,12 @@ def drop_stray_bullets(markdown: str) -> str:
 
 
 def _ordinals(text: str) -> str:
+    """Render 1st and 10th as HTML superscripts, matching the PDF."""
     return re.sub(r"(\d+)(st|nd|rd|th)\b", r"\1<sup>\2</sup>", text)
 
 
 def restore_review_dates(markdown: str, pdf_path: Path) -> str:
+    """Insert the PDF's review-date lines under the title when Markdown dropped them."""
     if "Review Date" in markdown:
         return markdown
     document = pymupdf.open(pdf_path)
@@ -78,6 +82,7 @@ def restore_review_dates(markdown: str, pdf_path: Path) -> str:
 
 
 def restore_rights_notice(markdown: str, pdf_path: Path) -> str:
+    """Append the Coforge copyright line when the PDF has it and Markdown does not."""
     notice = "© 2026 Coforge. All rights reserved."
     if notice in markdown:
         return markdown
@@ -89,6 +94,7 @@ def restore_rights_notice(markdown: str, pdf_path: Path) -> str:
 
 
 def _column_bounds(header: list[tuple]) -> list[tuple[str, float]]:
+    """Return each FY25 column label and the x position where the next column starts."""
     named = [(word[4], word[0]) for word in header if word[4] in {"EMISSIONS", "India", "UK"}]
     named.sort(key=lambda item: item[1])
     bounds: list[tuple[str, float]] = []
@@ -102,6 +108,7 @@ def _column_bounds(header: list[tuple]) -> list[tuple[str, float]]:
 
 
 def _line_cells(line: list[tuple], bounds: list[tuple[str, float]]) -> dict[str, str]:
+    """Place each word on a PDF line into the column whose right edge it falls under."""
     cells = {label: [] for label, _edge in bounds}
     for word in line:
         for label, edge in bounds:
@@ -170,6 +177,7 @@ _FY25_TABLE = re.compile(
 
 
 def repair_fy25_table(markdown: str, table: str | None) -> str:
+    """Replace the scrambled FY25 table in Markdown with the one rebuilt from the PDF."""
     if table is None or not _FY25_TABLE.search(markdown):
         return markdown
     replacement = (
@@ -181,6 +189,7 @@ def repair_fy25_table(markdown: str, table: str | None) -> str:
 
 
 def clean_markdown(markdown: str, pdf_path: Path, current_year: str | None) -> str:
+    """Apply every Markdown cleanup step, using the PDF to restore dropped text."""
     markdown = _MARK.sub("", markdown)
     markdown = _PICTURE_START.sub("", markdown)
     markdown = _PICTURE_END.sub("", markdown)
@@ -192,7 +201,11 @@ def clean_markdown(markdown: str, pdf_path: Path, current_year: str | None) -> s
 
 
 def convert_pdf(pdf_path: Path, output_dir: Path) -> Path:
-    # Read table cells before to_markdown; that call rewrites page text.
+    """Write one PDF to ``output_dir`` as a Markdown file and return that path.
+
+    The FY25 table is read from the PDF first, because converting to Markdown
+    rewrites the page text those cells come from.
+    """
     current_year = fy25_table(pdf_path)
     markdown = pymupdf4llm.to_markdown(
         str(pdf_path),
@@ -207,11 +220,13 @@ def convert_pdf(pdf_path: Path, output_dir: Path) -> Path:
 
 
 def convert_all(data_dir: Path = DATA_DIR, output_dir: Path = OUTPUT_DIR) -> list[Path]:
+    """Convert every PDF in ``data_dir`` and return the Markdown paths."""
     pdfs = sorted(path for path in data_dir.glob("*.pdf") if path.is_file())
     return [convert_pdf(pdf, output_dir) for pdf in pdfs]
 
 
 def main() -> None:
+    """Convert the PDFs in data/ and print each Markdown path that was written."""
     written = convert_all()
     if not written:
         raise SystemExit(f"No PDFs found in {DATA_DIR}")
