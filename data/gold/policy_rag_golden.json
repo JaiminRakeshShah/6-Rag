@@ -1,0 +1,1547 @@
+{
+  "schema_version": "1.0.0",
+  "dataset_id": "coforge-policy-rag-golden",
+  "description": "Unit evaluation set for the four Coforge policy Markdown files. Each item is one scored question. supporting_sections are the chunker sections that contain the answer. evidence text is a verbatim substring of that section body, or of the section name when in is section_name.",
+  "corpus": [
+    {
+      "document_id": "Carbon_New_2040",
+      "filename": "Carbon_New_2040.md",
+      "role": "current"
+    },
+    {
+      "document_id": "Carbon_Old_2050",
+      "filename": "Carbon_Old_2050.md",
+      "role": "superseded"
+    },
+    {
+      "document_id": "Envi_2040-1",
+      "filename": "Envi_2040-1.md",
+      "role": "current"
+    },
+    {
+      "document_id": "Water-Management-Policy",
+      "filename": "Water-Management-Policy.md",
+      "role": "current"
+    }
+  ],
+  "question_types": [
+    "factual",
+    "numeric",
+    "yes_no",
+    "list",
+    "temporal",
+    "definition",
+    "comparison",
+    "cross_document",
+    "version_conflict",
+    "multi_section",
+    "conflict",
+    "unanswerable"
+  ],
+  "grading": {
+    "retrieval": "A retrieved chunk is relevant when its section_id is listed in supporting_sections. If chunk_index is set, the relevant chunk is that index within the section.",
+    "answer": "Score an answer against answer_must_include, case-insensitive. expected_answer is the reference wording. When abstain is true, a correct answer declines and does not invent a figure or a name.",
+    "distractors": "distractor_sections contain a competing figure or a lookalike passage. They are not relevant for the question as asked."
+  },
+  "items": [
+    {
+      "id": "gold-001",
+      "question": "By which year does the current Carbon Reduction Plan commit Coforge to Net Zero?",
+      "question_type": "factual",
+      "difficulty": "easy",
+      "abstain": false,
+      "expected_answer": "2040",
+      "answer_must_include": [
+        "2040"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#1",
+          "section_name": "Commitment to Achieving Net Zero",
+          "evidence": [
+            {
+              "text": "Net Zero emission by 2040",
+              "in": "body"
+            }
+          ]
+        }
+      ],
+      "distractor_sections": [
+        {
+          "document_id": "Carbon_Old_2050",
+          "filename": "Carbon_Old_2050.md",
+          "section_id": "Carbon_Old_2050#2",
+          "section_name": "Commitment to Achieving Net Zero",
+          "evidence": [
+            {
+              "text": "by 2050",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-002",
+      "question": "What Net Zero year does the superseded Carbon Reduction Plan state?",
+      "question_type": "version_conflict",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "2050",
+      "answer_must_include": [
+        "2050"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_Old_2050",
+          "filename": "Carbon_Old_2050.md",
+          "section_id": "Carbon_Old_2050#2",
+          "section_name": "Commitment to Achieving Net Zero",
+          "evidence": [
+            {
+              "text": "by 2050",
+              "in": "body"
+            }
+          ]
+        }
+      ],
+      "distractor_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#1",
+          "section_name": "Commitment to Achieving Net Zero",
+          "evidence": [
+            {
+              "text": "Net Zero emission by 2040",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-003",
+      "question": "What is the publication date of the current Carbon Reduction Plan?",
+      "question_type": "temporal",
+      "difficulty": "easy",
+      "abstain": false,
+      "expected_answer": "10 October 2025",
+      "answer_must_include": [
+        "10 October 2025"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#0",
+          "section_name": "Preamble",
+          "evidence": [
+            {
+              "text": "Publication date: 10 October 2025",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-004",
+      "question": "What document ID does the archived Carbon Reduction Plan give itself?",
+      "question_type": "factual",
+      "difficulty": "easy",
+      "abstain": false,
+      "expected_answer": "CARBON-POL-2023-V1.0",
+      "answer_must_include": [
+        "CARBON-POL-2023-V1.0"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_Old_2050",
+          "filename": "Carbon_Old_2050.md",
+          "section_id": "Carbon_Old_2050#1",
+          "section_name": "Preamble",
+          "evidence": [
+            {
+              "text": "CARBON-POL-2023-V1.0",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-005",
+      "question": "What version number does the archived Carbon Reduction Plan print in its status line?",
+      "question_type": "factual",
+      "difficulty": "easy",
+      "abstain": false,
+      "expected_answer": "1.0",
+      "answer_must_include": [
+        "1.0"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_Old_2050",
+          "filename": "Carbon_Old_2050.md",
+          "section_id": "Carbon_Old_2050#0",
+          "section_name": "Preamble",
+          "evidence": [
+            {
+              "text": "Version 1.0",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-006",
+      "question": "Is the Carbon Reduction Plan dated 12 March 2023 the current commitment?",
+      "question_type": "yes_no",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "No. That copy is marked superseded and replaced by the Carbon Reduction Plan dated 10 October 2025.",
+      "answer_must_include": [
+        "no",
+        "superseded",
+        "10 October 2025"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_Old_2050",
+          "filename": "Carbon_Old_2050.md",
+          "section_id": "Carbon_Old_2050#0",
+          "section_name": "Preamble",
+          "evidence": [
+            {
+              "text": "DOCUMENT STATUS: SUPERSEDED",
+              "in": "body"
+            },
+            {
+              "text": "12 March 2023",
+              "in": "body"
+            },
+            {
+              "text": "10 October 2025",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-007",
+      "question": "In the current Carbon Reduction Plan, what are India's FY24 baseline Scope 1, Scope 2, Scope 3, and total emissions in tCO2e?",
+      "question_type": "numeric",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "Scope 1 is 413, Scope 2 is 8,688, Scope 3 is 5,543, and the total is 14,644.",
+      "answer_must_include": [
+        "413",
+        "8,688",
+        "5,543",
+        "14,644"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#2",
+          "section_name": "Baseline Emissions Footprint",
+          "evidence": [
+            {
+              "text": "|Scope 1|413|",
+              "in": "body"
+            },
+            {
+              "text": "|Scope 2|8,688|",
+              "in": "body"
+            },
+            {
+              "text": "|Scope 3|5,543|",
+              "in": "body"
+            },
+            {
+              "text": "**14,644**",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-008",
+      "question": "What is the UK FY24 baseline total emissions figure in the current Carbon Reduction Plan?",
+      "question_type": "numeric",
+      "difficulty": "easy",
+      "abstain": false,
+      "expected_answer": "914.38 tCO2e",
+      "answer_must_include": [
+        "914.38"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#3",
+          "section_name": "Additional details relating to the baseline emissions calculations",
+          "evidence": [
+            {
+              "text": "**914.38**",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-009",
+      "question": "Why does the current Carbon Reduction Plan report no UK Scope 1 emissions in the baseline year?",
+      "question_type": "factual",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "UK offices do not use natural gas, oil, or LPG, and they have no owned vehicles.",
+      "answer_must_include": [
+        "natural gas",
+        "owned vehicles"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#3",
+          "section_name": "Additional details relating to the baseline emissions calculations",
+          "evidence": [
+            {
+              "text": "no offices in these locations use natural gas, oil, LPG or have any owned vehicles",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-010",
+      "question": "Which partner does the current Carbon Reduction Plan name for the international carbon-footprint assessment?",
+      "question_type": "factual",
+      "difficulty": "easy",
+      "abstain": false,
+      "expected_answer": "Carbon Footprint",
+      "answer_must_include": [
+        "Carbon Footprint"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#3",
+          "section_name": "Additional details relating to the baseline emissions calculations",
+          "evidence": [
+            {
+              "text": "\"Carbon Footprint\"",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-011",
+      "question": "What reporting period does the current Carbon Reduction Plan use for FY25?",
+      "question_type": "temporal",
+      "difficulty": "easy",
+      "abstain": false,
+      "expected_answer": "1 April 2024 to 31 March 2025",
+      "answer_must_include": [
+        "1 April 2024",
+        "31 March 2025"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#4",
+          "section_name": "Current year emissions: FY25",
+          "evidence": [
+            {
+              "text": "1 April 2024 – 31 March 2025",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-012",
+      "question": "In the current Carbon Reduction Plan, what are the FY25 total emissions for India and for the UK?",
+      "question_type": "comparison",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "India 37,445 tCO2e and the UK 852.95 tCO2e.",
+      "answer_must_include": [
+        "37,445",
+        "852.95"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#4",
+          "section_name": "Current year emissions: FY25",
+          "evidence": [
+            {
+              "text": "**37,445**",
+              "in": "body"
+            },
+            {
+              "text": "**852.95**",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-013",
+      "question": "About how many people does the current Carbon Reduction Plan say are in India?",
+      "question_type": "numeric",
+      "difficulty": "easy",
+      "abstain": false,
+      "expected_answer": "approximately 20,000",
+      "answer_must_include": [
+        "20,000"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#4",
+          "section_name": "Current year emissions: FY25",
+          "evidence": [
+            {
+              "text": "approximately 20,000 people",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-014",
+      "question": "By how much does the current Carbon Reduction Plan say the business grew in the past four years?",
+      "question_type": "numeric",
+      "difficulty": "easy",
+      "abstain": false,
+      "expected_answer": "over 100%",
+      "answer_must_include": [
+        "100%"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#5",
+          "section_name": "Emissions Reduction Targets",
+          "evidence": [
+            {
+              "text": "grown over 100% in the past 4 years",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-015",
+      "question": "What activity does the current Carbon Reduction Plan call a significant emissions contributor for international locations?",
+      "question_type": "factual",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "air travel",
+      "answer_must_include": [
+        "air"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#5",
+          "section_name": "Emissions Reduction Targets",
+          "evidence": [
+            {
+              "text": "air-travel",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-016",
+      "question": "Which ISO standards does the current Carbon Reduction Plan say the environment, health, and safety management system conforms to?",
+      "question_type": "list",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "ISO 14001:2015 and ISO 45001:2018",
+      "answer_must_include": [
+        "ISO 14001:2015",
+        "ISO 45001:2018"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#6",
+          "section_name": "Carbon Reduction Initiatives",
+          "evidence": [
+            {
+              "text": "ISO 14001:2015 and ISO 45001:2018",
+              "in": "body"
+            }
+          ],
+          "chunk_index": 0
+        }
+      ]
+    },
+    {
+      "id": "gold-017",
+      "question": "What rooftop solar capacity does the current Carbon Reduction Plan cite at the main India campus?",
+      "question_type": "numeric",
+      "difficulty": "easy",
+      "abstain": false,
+      "expected_answer": "75 KWp",
+      "answer_must_include": [
+        "75 KWp"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#6",
+          "section_name": "Carbon Reduction Initiatives",
+          "evidence": [
+            {
+              "text": "75 KWp",
+              "in": "body"
+            }
+          ],
+          "chunk_index": 0
+        }
+      ]
+    },
+    {
+      "id": "gold-018",
+      "question": "In the current Carbon Reduction Plan, what electric-vehicle share of the employee transport fleet is targeted for 2028 and for 2032?",
+      "question_type": "numeric",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "10% by 2028 and about 50% by 2032",
+      "answer_must_include": [
+        "10%",
+        "2028",
+        "50%",
+        "2032"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#6",
+          "section_name": "Carbon Reduction Initiatives",
+          "evidence": [
+            {
+              "text": "10% integration by 2028 and ~50% by 2032",
+              "in": "body"
+            }
+          ],
+          "chunk_index": 0
+        }
+      ],
+      "distractor_sections": [
+        {
+          "document_id": "Carbon_Old_2050",
+          "filename": "Carbon_Old_2050.md",
+          "section_id": "Carbon_Old_2050#8",
+          "section_name": "Carbon Reduction Initiatives",
+          "evidence": [
+            {
+              "text": "5% integration by 2028",
+              "in": "body"
+            }
+          ]
+        },
+        {
+          "document_id": "Envi_2040-1",
+          "filename": "Envi_2040-1.md",
+          "section_id": "Envi_2040-1#5",
+          "section_name": "Energy Optimization and Emission Management",
+          "evidence": [
+            {
+              "text": "10% by 2025 and to 50% by 2040",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-019",
+      "question": "Do the current Carbon Reduction Plan and the Environmental Sustainability Policy set the same years for electric vehicles in the employee fleet?",
+      "question_type": "cross_document",
+      "difficulty": "hard",
+      "abstain": false,
+      "expected_answer": "No. The carbon plan targets 10% by 2028 and about 50% by 2032. The environmental policy targets 10% by 2025 and 50% by 2040.",
+      "answer_must_include": [
+        "2028",
+        "2032",
+        "2025",
+        "2040"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#6",
+          "section_name": "Carbon Reduction Initiatives",
+          "evidence": [
+            {
+              "text": "10% integration by 2028 and ~50% by 2032",
+              "in": "body"
+            }
+          ],
+          "chunk_index": 0
+        },
+        {
+          "document_id": "Envi_2040-1",
+          "filename": "Envi_2040-1.md",
+          "section_id": "Envi_2040-1#5",
+          "section_name": "Energy Optimization and Emission Management",
+          "evidence": [
+            {
+              "text": "10% by 2025 and to 50% by 2040",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-020",
+      "question": "By which year does each current document say electricity will be 100% renewable: the Carbon Reduction Plan and the Environmental Sustainability Policy?",
+      "question_type": "cross_document",
+      "difficulty": "hard",
+      "abstain": false,
+      "expected_answer": "The Carbon Reduction Plan says 2040. The Environmental Sustainability Policy says 2050. Both cite the RE100 commitment.",
+      "answer_must_include": [
+        "2040",
+        "2050"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#6",
+          "section_name": "Carbon Reduction Initiatives",
+          "evidence": [
+            {
+              "text": "100% renewable energy by 2040",
+              "in": "body"
+            }
+          ],
+          "chunk_index": 0
+        },
+        {
+          "document_id": "Envi_2040-1",
+          "filename": "Envi_2040-1.md",
+          "section_id": "Envi_2040-1#5",
+          "section_name": "Energy Optimization and Emission Management",
+          "evidence": [
+            {
+              "text": "100% renewable energy by 2050",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-021",
+      "question": "What 2025 green-energy procurement share does the superseded Carbon Reduction Plan state?",
+      "question_type": "version_conflict",
+      "difficulty": "hard",
+      "abstain": false,
+      "expected_answer": "5%",
+      "answer_must_include": [
+        "5%"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_Old_2050",
+          "filename": "Carbon_Old_2050.md",
+          "section_id": "Carbon_Old_2050#8",
+          "section_name": "Carbon Reduction Initiatives",
+          "evidence": [
+            {
+              "text": "5% green energy",
+              "in": "body"
+            }
+          ],
+          "chunk_index": 0
+        }
+      ],
+      "distractor_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#6",
+          "section_name": "Carbon Reduction Initiatives",
+          "evidence": [
+            {
+              "text": "10% green energy",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-022",
+      "question": "What green-energy shares for 2025 and 2030 does the current Carbon Reduction Plan state, and does the Environmental Sustainability Policy state the same shares?",
+      "question_type": "comparison",
+      "difficulty": "hard",
+      "abstain": false,
+      "expected_answer": "Both say 10% by 2025 and about 50% by 2030. The environmental policy specifies 10% of electricity from green sources.",
+      "answer_must_include": [
+        "10%",
+        "2025",
+        "50%",
+        "2030"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#6",
+          "section_name": "Carbon Reduction Initiatives",
+          "evidence": [
+            {
+          "text": "10% green energy",
+          "in": "body"
+        },
+        {
+          "text": "~ 50% by 2030",
+          "in": "body"
+        }
+      ],
+      "chunk_index": 0
+    },
+    {
+      "document_id": "Envi_2040-1",
+      "filename": "Envi_2040-1.md",
+      "section_id": "Envi_2040-1#5",
+      "section_name": "Energy Optimization and Emission Management",
+      "evidence": [
+        {
+          "text": "10% of electricity from green sources by 2025",
+          "in": "body"
+        },
+        {
+          "text": "~50% by 2030",
+          "in": "body"
+        }
+      ]
+    }
+      ]
+    },
+    {
+      "id": "gold-023",
+      "question": "What UK electronic-waste compliance standard does the current Carbon Reduction Plan say Coforge follows?",
+      "question_type": "factual",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "Waste Electrical and Electronic Equipment (WEEE)",
+      "answer_must_include": [
+        "WEEE"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#6",
+          "section_name": "Carbon Reduction Initiatives",
+          "evidence": [
+            {
+              "text": "WEEE",
+              "in": "body"
+            }
+          ],
+          "chunk_index": 1
+        }
+      ]
+    },
+    {
+      "id": "gold-024",
+      "question": "How many sustainability training sessions does the current Carbon Reduction Plan say are held each year, and how are they split?",
+      "question_type": "list",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "One mandatory session and two voluntary sessions.",
+      "answer_must_include": [
+        "one mandatory",
+        "two voluntary"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#6",
+          "section_name": "Carbon Reduction Initiatives",
+          "evidence": [
+            {
+              "text": "one mandatory and two voluntary training sessions annually",
+              "in": "body"
+            }
+          ],
+          "chunk_index": 1
+        }
+      ]
+    },
+    {
+      "id": "gold-025",
+      "question": "Which procurement policy note does the current Carbon Reduction Plan say it was completed in accordance with?",
+      "question_type": "factual",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "PPN 06/21",
+      "answer_must_include": [
+        "PPN 06/21"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#7",
+          "section_name": "Declaration and Sign Off",
+          "evidence": [
+            {
+              "text": "PPN 06/21",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-026",
+      "question": "Who is named on the current Carbon Reduction Plan sign-off, and what title is given?",
+      "question_type": "multi_section",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "John Speight, President and Head of Europe (EVP). The name is the section heading.",
+      "answer_must_include": [
+        "John Speight",
+        "President and Head of Europe"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_New_2040",
+          "filename": "Carbon_New_2040.md",
+          "section_id": "Carbon_New_2040#8",
+          "section_name": "John Speight",
+          "evidence": [
+            {
+              "text": "John Speight",
+              "in": "section_name"
+            },
+            {
+              "text": "President and Head of Europe (EVP)",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-027",
+      "question": "Who signs the superseded Carbon Reduction Plan, according to its declaration?",
+      "question_type": "factual",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "John Speight, President and Head of Europe (EVP)",
+      "answer_must_include": [
+        "John Speight",
+        "President and Head of Europe"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Carbon_Old_2050",
+          "filename": "Carbon_Old_2050.md",
+          "section_id": "Carbon_Old_2050#9",
+          "section_name": "Declaration and Sign Off",
+          "evidence": [
+            {
+              "text": "John Speight",
+              "in": "body"
+            },
+            {
+              "text": "President and Head of Europe (EVP)",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-028",
+      "question": "What review date and last-review date does the Environmental Sustainability Policy give?",
+      "question_type": "temporal",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "Review date 10 March 2026. Last review 1 April 2025.",
+      "answer_must_include": [
+        "March 2026",
+        "April 2025"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Envi_2040-1",
+          "filename": "Envi_2040-1.md",
+          "section_id": "Envi_2040-1#0",
+          "section_name": "Preamble",
+          "evidence": [
+            {
+              "text": "10<sup>th</sup> March 2026",
+              "in": "body"
+            },
+            {
+              "text": "1<sup>st</sup> April 2025",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-029",
+      "question": "Does the Environmental Sustainability Policy apply only to facilities Coforge owns?",
+      "question_type": "yes_no",
+      "difficulty": "easy",
+      "abstain": false,
+      "expected_answer": "No. It applies to rented, leased, and owned facilities.",
+      "answer_must_include": [
+        "no",
+        "rented",
+        "leased",
+        "owned"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Envi_2040-1",
+          "filename": "Envi_2040-1.md",
+          "section_id": "Envi_2040-1#2",
+          "section_name": "Scope",
+          "evidence": [
+            {
+              "text": "rented/ leased or owned",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-030",
+      "question": "By when does the Environmental Sustainability Policy commit Coforge to carbon neutrality in operations, and what year-on-year GHG reduction does it set?",
+      "question_type": "numeric",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "Carbon neutral in operations by 2040, with a 5% year-on-year GHG reduction.",
+      "answer_must_include": [
+        "2040",
+        "5%"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Envi_2040-1",
+          "filename": "Envi_2040-1.md",
+          "section_id": "Envi_2040-1#5",
+          "section_name": "Energy Optimization and Emission Management",
+          "evidence": [
+            {
+              "text": "Carbon Neutral in our operations by 2040",
+              "in": "body"
+            },
+            {
+              "text": "5% year-on-year",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-031",
+      "question": "What overall waste goal and three named zero-waste commitments does the Environmental Sustainability Policy set?",
+      "question_type": "list",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "Zero Waste by 2040, covering Zero Food Waste, Zero Plastic Waste, and Zero Waste to Landfill.",
+      "answer_must_include": [
+        "Zero Waste by 2040",
+        "Zero Food Waste",
+        "Zero Plastic Waste",
+        "Zero Waste to Landfill"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Envi_2040-1",
+          "filename": "Envi_2040-1.md",
+          "section_id": "Envi_2040-1#6",
+          "section_name": "Waste Management and Circularity",
+          "evidence": [
+            {
+              "text": "Zero Waste by 2040",
+              "in": "body"
+            },
+            {
+              "text": "Zero Food Waste",
+              "in": "body"
+            },
+            {
+              "text": "Zero Plastic Waste",
+              "in": "body"
+            },
+            {
+              "text": "Zero Waste to Landfill",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-032",
+      "question": "What non-potable water target and baseline does the Environmental Sustainability Policy set?",
+      "question_type": "numeric",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "Increase non-potable water use to 75% by 2040 from a baseline of 50% in FY2023.",
+      "answer_must_include": [
+        "75%",
+        "2040",
+        "50%",
+        "FY2023"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Envi_2040-1",
+          "filename": "Envi_2040-1.md",
+          "section_id": "Envi_2040-1#7",
+          "section_name": "Water Management",
+          "evidence": [
+            {
+              "text": "75% by 2040 from the baseline of 50% in FY2023",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-033",
+      "question": "What share of Pan-India operations does the Environmental Sustainability Policy say ISO 14001 already covers, and by when should coverage be complete?",
+      "question_type": "numeric",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "60% today, and 100% by the end of 2025.",
+      "answer_must_include": [
+        "60%",
+        "100%",
+        "2025"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Envi_2040-1",
+          "filename": "Envi_2040-1.md",
+          "section_id": "Envi_2040-1#8",
+          "section_name": "Environmental Management System",
+          "evidence": [
+            {
+              "text": "60% of its operations Pan India",
+              "in": "body"
+            },
+            {
+              "text": "100% coverage by the end of 2025",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-034",
+      "question": "Which greenhouse-gas scopes does the Environmental Sustainability Policy include in its SBTi plan now, and which scope does it defer?",
+      "question_type": "factual",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "Scope 1 and Scope 2 now. Scope 3 is deferred.",
+      "answer_must_include": [
+        "Scope 1",
+        "Scope 2",
+        "Scope 3"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Envi_2040-1",
+          "filename": "Envi_2040-1.md",
+          "section_id": "Envi_2040-1#10",
+          "section_name": "Decarbonization Strategy",
+          "evidence": [
+            {
+              "text": "Scope 1 and Scope 2",
+              "in": "body"
+            },
+            {
+              "text": "address Scope 3 emissions in the future",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-035",
+      "question": "How often does the Environmental Sustainability Policy say the ESG Committee reviews it, and how often does EHS track the targets?",
+      "question_type": "temporal",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "The ESG Committee reviews it annually, or when required. EHS tracks progress monthly.",
+      "answer_must_include": [
+        "annual",
+        "monthly"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Envi_2040-1",
+          "filename": "Envi_2040-1.md",
+          "section_id": "Envi_2040-1#11",
+          "section_name": "Monitoring",
+          "evidence": [
+            {
+              "text": "annual basis",
+              "in": "body"
+            },
+            {
+              "text": "monthly basis",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-036",
+      "question": "How does the Water Management Policy define Water Positive?",
+      "question_type": "definition",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "Replenishing more water than is consumed across owned operations.",
+      "answer_must_include": [
+        "replenishing",
+        "consumed"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Water-Management-Policy",
+          "filename": "Water-Management-Policy.md",
+          "section_id": "Water-Management-Policy#2",
+          "section_name": "Purpose",
+          "evidence": [
+            {
+              "text": "replenishing more water than is consumed",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-037",
+      "question": "What is the review date of the Water Management Policy?",
+      "question_type": "temporal",
+      "difficulty": "easy",
+      "abstain": false,
+      "expected_answer": "10 August 2026",
+      "answer_must_include": [
+        "August 2026"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Water-Management-Policy",
+          "filename": "Water-Management-Policy.md",
+          "section_id": "Water-Management-Policy#0",
+          "section_name": "Preamble",
+          "evidence": [
+            {
+              "text": "10<sup>th</sup> August 2026",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-038",
+      "question": "Which two UN Sustainable Development Goals does the Water Management Policy name in its legal-compliance commitments?",
+      "question_type": "list",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "SDG 6 (Clean Water and Sanitation) and SDG 11 (Sustainable Cities and Communities).",
+      "answer_must_include": [
+        "SDG 6",
+        "SDG 11"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Water-Management-Policy",
+          "filename": "Water-Management-Policy.md",
+          "section_id": "Water-Management-Policy#5",
+          "section_name": "Legal and Regulatory Compliance",
+          "evidence": [
+            {
+              "text": "SDG 6 (Clean Water and Sanitation) and SDG 11",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-039",
+      "question": "Within what period does the Water Management Policy say major facilities will get water balance assessments?",
+      "question_type": "temporal",
+      "difficulty": "easy",
+      "abstain": false,
+      "expected_answer": "Over the next two years.",
+      "answer_must_include": [
+        "two years"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Water-Management-Policy",
+          "filename": "Water-Management-Policy.md",
+          "section_id": "Water-Management-Policy#6",
+          "section_name": "Responsible Water Use and Conservation",
+          "evidence": [
+            {
+              "text": "Over the next two years",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-040",
+      "question": "For which non-potable uses does the Water Management Policy say treated wastewater from STPs or ETPs may be reused?",
+      "question_type": "list",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "Flushing, irrigation, landscaping, and HVAC or cooling systems.",
+      "answer_must_include": [
+        "flushing",
+        "irrigation",
+        "landscaping",
+        "HVAC"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Water-Management-Policy",
+          "filename": "Water-Management-Policy.md",
+          "section_id": "Water-Management-Policy#7",
+          "section_name": "Water Recycling, Harvesting and Reuse",
+          "evidence": [
+            {
+              "text": "flushing, irrigation, landscaping, and HVAC/cooling systems",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-041",
+      "question": "Does the Water Management Policy require zero discharge at every facility?",
+      "question_type": "yes_no",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "No. Zero discharge applies wherever it is applicable and technically feasible.",
+      "answer_must_include": [
+        "no",
+        "technically feasible"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Water-Management-Policy",
+          "filename": "Water-Management-Policy.md",
+          "section_id": "Water-Management-Policy#8",
+          "section_name": "Water Quality and Pollution Prevention",
+          "evidence": [
+            {
+              "text": "wherever applicable and technically feasible",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-042",
+      "question": "By which year does the Water Management Policy require water risk assessments for all owned facilities and prioritized leased facilities?",
+      "question_type": "numeric",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "2030",
+      "answer_must_include": [
+        "2030"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Water-Management-Policy",
+          "filename": "Water-Management-Policy.md",
+          "section_id": "Water-Management-Policy#12",
+          "section_name": "Objectives and Targets",
+          "evidence": [
+            {
+              "text": "2030",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-043",
+      "question": "Which two external tools does the Water Management Policy name for water risk assessment?",
+      "question_type": "list",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "The WRI Aqueduct Water Risk Atlas and the WWF Water Risk Filter.",
+      "answer_must_include": [
+        "Aqueduct",
+        "WWF Water Risk Filter"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Water-Management-Policy",
+          "filename": "Water-Management-Policy.md",
+          "section_id": "Water-Management-Policy#13",
+          "section_name": "Water Risk Assessment",
+          "evidence": [
+            {
+              "text": "WRI Aqueduct Water Risk Atlas",
+              "in": "body"
+            },
+            {
+              "text": "WWF Water Risk Filter",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-044",
+      "question": "How often does the Water Management Policy say Facilities reports water performance upward?",
+      "question_type": "conflict",
+      "difficulty": "hard",
+      "abstain": false,
+      "expected_answer": "The governance section says Facilities prepares a half-year trend-analysis report for the CSR & ESG Committee. The monitoring section says a quarterly trend analysis report goes to the ESG Committee. Both statements are in the policy.",
+      "answer_must_include": [
+        "half",
+        "quarterly"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Water-Management-Policy",
+          "filename": "Water-Management-Policy.md",
+          "section_id": "Water-Management-Policy#14",
+          "section_name": "Governance and Roles & Responsibilities",
+          "evidence": [
+            {
+              "text": "prepares a half-<br>year trend-analysis report",
+              "in": "body"
+            }
+          ]
+        },
+        {
+          "document_id": "Water-Management-Policy",
+          "filename": "Water-Management-Policy.md",
+          "section_id": "Water-Management-Policy#15",
+          "section_name": "Monitoring, Reporting and Disclosure",
+          "evidence": [
+            {
+              "text": "A quarterly trend analysis report",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-045",
+      "question": "How can someone raise a concern about the Water Management Policy, and what protection does the policy state?",
+      "question_type": "factual",
+      "difficulty": "medium",
+      "abstain": false,
+      "expected_answer": "Through the Whistleblower channel or the local grievance mechanism. Handling is confidential and non-retaliatory.",
+      "answer_must_include": [
+        "Whistleblower",
+        "non-retaliation"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Water-Management-Policy",
+          "filename": "Water-Management-Policy.md",
+          "section_id": "Water-Management-Policy#16",
+          "section_name": "Grievance Mechanism",
+          "evidence": [
+            {
+              "text": "Whistleblower",
+              "in": "body"
+            },
+            {
+              "text": "non-retaliation",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-046",
+      "question": "Which external frameworks does the Water Management Policy list in its alignment section?",
+      "question_type": "list",
+      "difficulty": "hard",
+      "abstain": false,
+      "expected_answer": "ISO 14001:2015, GRI 303, the SEBI BRSR, the UN Global Compact CEO Water Mandate, and SDGs 6 and 11.",
+      "answer_must_include": [
+        "ISO 14001:2015",
+        "GRI 303",
+        "CEO Water Mandate",
+        "SDG 6",
+        "SDG 11"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Water-Management-Policy",
+          "filename": "Water-Management-Policy.md",
+          "section_id": "Water-Management-Policy#17",
+          "section_name": "Alignment with Frameworks and Standards",
+          "evidence": [
+            {
+              "text": "ISO 14001:2015",
+              "in": "body"
+            },
+            {
+              "text": "GRI 303",
+              "in": "body"
+            },
+            {
+              "text": "CEO Water Mandate",
+              "in": "body"
+            },
+            {
+              "text": "SDG 6",
+              "in": "body"
+            },
+            {
+              "text": "SDG 11",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-047",
+      "question": "How many countries and delivery centers does the Environmental Sustainability Policy's company description mention?",
+      "question_type": "numeric",
+      "difficulty": "easy",
+      "abstain": false,
+      "expected_answer": "21 countries and 26 delivery centers across nine countries.",
+      "answer_must_include": [
+        "21",
+        "26"
+      ],
+      "supporting_sections": [
+        {
+          "document_id": "Envi_2040-1",
+          "filename": "Envi_2040-1.md",
+          "section_id": "Envi_2040-1#13",
+          "section_name": "John Speight",
+          "evidence": [
+            {
+              "text": "21 countries",
+              "in": "body"
+            },
+            {
+              "text": "26 delivery centers across nine countries",
+              "in": "body"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gold-048",
+      "question": "What were Coforge's FY25 Scope 2 emissions in the United States?",
+      "question_type": "unanswerable",
+      "difficulty": "medium",
+      "abstain": true,
+      "expected_answer": null,
+      "answer_must_include": [],
+      "supporting_sections": [],
+      "notes": "FY25 figures in both carbon plans cover India and the UK only."
+    },
+    {
+      "id": "gold-049",
+      "question": "What is John Speight's email address?",
+      "question_type": "unanswerable",
+      "difficulty": "hard",
+      "abstain": true,
+      "expected_answer": null,
+      "answer_must_include": [],
+      "supporting_sections": [],
+      "distractor_sections": [
+        {
+          "document_id": "Envi_2040-1",
+          "filename": "Envi_2040-1.md",
+          "section_id": "Envi_2040-1#13",
+          "section_name": "John Speight",
+          "evidence": [
+            {
+              "text": "information@coforge.com",
+              "in": "body"
+            }
+          ]
+        }
+      ],
+      "notes": "information@coforge.com is a company contact in the closing boilerplate, not John Speight's address."
+    },
+    {
+      "id": "gold-050",
+      "question": "Who approved the Water Management Policy?",
+      "question_type": "unanswerable",
+      "difficulty": "hard",
+      "abstain": true,
+      "expected_answer": null,
+      "answer_must_include": [],
+      "supporting_sections": [],
+      "notes": "The Markdown contains an empty heading 'John Speight' under Approved by. Chunking skips headings with no body, so no stored section contains that name."
+    }
+  ]
+}
