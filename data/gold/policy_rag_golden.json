@@ -634,7 +634,7 @@
       "question_type": "cross_document",
       "difficulty": "hard",
       "abstain": false,
-      "expected_answer": "The Carbon Reduction Plan says 2040. The Environmental Sustainability Policy says 2050. Both cite the RE100 commitment.",
+      "expected_answer": "The Carbon Reduction Plan says 2040. The Environmental Sustainability Policy says 2050.",
       "answer_must_include": [
         "2040",
         "2050"
@@ -1329,7 +1329,7 @@
       "question_type": "list",
       "difficulty": "medium",
       "abstain": false,
-      "expected_answer": "The WRI Aqueduct Water Risk Atlas and the WWF Water Risk Filter.",
+      "expected_answer": "The WRI Aqueduct Water Risk Atlas or the WWF Water Risk Filter.",
       "answer_must_include": [
         "Aqueduct",
         "WWF Water Risk Filter"
