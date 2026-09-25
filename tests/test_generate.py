@@ -1,7 +1,8 @@
 import pytest
 
 from src import config
-from src.generate import generate
+from src.generate import generate, generation_prompt
+from src.retrieve import HybridHit
 
 
 class _Response:
@@ -64,6 +65,33 @@ def test_unknown_model_does_not_call_the_server(monkeypatch: pytest.MonkeyPatch)
 
     with pytest.raises(ValueError, match="gemma"):
         generate("hello")
+
+
+def test_generation_prompt_uses_v2_and_keeps_json_braces(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, "PROMPT_VERSION", "v2")
+    hit = HybridHit(
+        chunk_id="Carbon_New_2040#1:0",
+        filename="Carbon_New_2040.md",
+        title="Carbon",
+        page_no=None,
+        section_name="Commitment to Achieving Net Zero",
+        parent_id="Carbon_New_2040#1",
+        start_span=0,
+        end_span=10,
+        document_date=None,
+        date_source=None,
+        version=None,
+        superseded=False,
+        body="Net Zero emission by 2040.",
+        score=1.0,
+        rrf_score=0.1,
+    )
+
+    prompt = generation_prompt("By which year?", [hit])
+
+    assert "status: current" in prompt
+    assert "Question: By which year?" in prompt
+    assert '{"answer": "...", "sections": [{"section_id": "...", "section_name": "..."}], "confidence": 0.0}' in prompt
 
 
 def test_missing_response_text_raises(monkeypatch: pytest.MonkeyPatch) -> None:

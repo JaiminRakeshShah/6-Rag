@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from deepeval.test_case import LLMTestCase
 
 from src.eval_generation import (
     ATTEMPTS,
@@ -13,18 +14,19 @@ from src.eval_generation import (
     citation_recall,
     cited_section,
     distractor_citation,
+    ANSWERS_PATH,
+    GOLD_PATH,
     evaluate,
     expected_output,
     generate_answers,
-    geval_metrics,
-    judge_model,
+    jev_score_payload,
+    measure_jev,
     generation_prompt,
     hard_checks_passed,
     parse_generation,
     phrase_coverage,
     required_phrases,
     score_answers,
-    score_item,
     token_f1,
 )
 from src.retrieve import INITIAL_K, HybridHit
@@ -84,16 +86,6 @@ def _cited(section_id: str, section_name: str = "") -> Generation:
         sections=(CitedSection(section_id, section_name),),
         confidence=0.5,
     )
-
-
-class _Metric:
-    def __init__(self, score: float) -> None:
-        self.score = score
-        self.case = None
-
-    def measure(self, test_case: object, _show_indicator: bool = True) -> float:
-        self.case = test_case
-        return self.score
 
 
 def test_prompt_asks_for_the_gold_section_fields() -> None:
@@ -351,95 +343,52 @@ class _Response:
         return self._payload
 
 
-def test_judge_posts_to_the_host_ollama_server(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
-    calls: list[tuple[str, dict]] = []
+def test_jev_choice_sends_meets_or_misses(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    calls: list[dict] = []
 
-    def fake_post(url: str, json: dict, timeout: float) -> _Response:
-        calls.append((url, json))
-        return _Response({"response": '{"score": 8, "reason": "supported"}'})
-
-    monkeypatch.setattr("src.eval_generation.httpx.post", fake_post)
-    from pydantic import BaseModel
-
-    class _Score(BaseModel):
-        score: int
-        reason: str
-
-    text = judge_model().generate("Score this.", schema=_Score)
-
-    assert text == '{"score": 8, "reason": "supported"}'
-    url, body = calls[0]
-    assert url == "http://host.docker.internal:11434/api/generate"
-    assert body["model"] == "gpt-oss:20b"
-    assert body["stream"] is False
-    assert body["think"] is False
-    assert body["options"] == {"temperature": 0}
-    assert body["prompt"] == "Score this."
-    assert "format" not in body
-    assert "top_k" not in body["options"]
-    assert "top_p" not in body["options"]
-
-
-def test_judge_reads_json_from_thinking_when_response_is_empty(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_post(url: str, json: dict, timeout: float) -> _Response:
-        return _Response({"response": "", "thinking": 'notes {"score": 1, "reason": "no"} tail', "done_reason": "stop"})
+    def fake_post(url: str, json: dict, headers: dict, timeout: float) -> _Response:
+        calls.append({"url": url, "json": json, "headers": headers, "timeout": timeout})
+        answers = {}
+        for name, choice in (("faithfulness", "meets"), ("groundedness", "meets"), ("correctness", "misses")):
+            answers[name] = {
+                "type": "choice",
+                "choice": choice,
+                "confidence": 0.8,
+                "probabilities": {"meets": 0.9 if choice == "meets" else 0.1, "misses": 0.1 if choice == "meets" else 0.9},
+            }
+        return _Response(
+            {
+                "model": "jev-1.13.0",
+                "answers": answers,
+                "usage": {"input_tokens": 20, "output_tokens": 9},
+            }
+        )
 
     monkeypatch.setattr("src.eval_generation.httpx.post", fake_post)
-
-    assert judge_model().generate("Score this.") == '{"score": 1, "reason": "no"}'
-
-
-def test_judge_reports_an_empty_reply(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_post(url: str, json: dict, timeout: float) -> _Response:
-        return _Response({"response": "", "thinking": "", "done_reason": "stop"})
-
-    monkeypatch.setattr("src.eval_generation.httpx.post", fake_post)
-
-    with pytest.raises(ValueError, match="done_reason=stop"):
-        judge_model().generate("Score this.")
-
-
-def test_judge_is_gptoss_at_temperature_zero() -> None:
-    metrics = geval_metrics()
-
-    assert set(metrics) == {"faithfulness", "groundedness", "correctness"}
-    for metric in metrics.values():
-        assert metric.model.name == "gpt-oss:20b"
-        assert metric.model.temperature == 0
-        assert metric.evaluation_steps
-        assert metric.async_mode is False
-
-
-def test_score_item_logs_the_judge_and_the_checks() -> None:
-    metrics = {
-        "faithfulness": _Metric(0.2),
-        "groundedness": _Metric(0.4),
-        "correctness": _Metric(0.6),
-    }
-    text = (
-        '{"answer": "2040", "sections": '
-        '[{"section_id": "Carbon_New_2040#1", "section_name": "Commitment to Achieving Net Zero"}], '
-        '"confidence": 0.7}'
+    case = LLMTestCase(
+        input="By which year?",
+        actual_output="2040",
+        expected_output="2040",
+        retrieval_context=["Net Zero emission by 2040."],
     )
-    row = score_item(_item(), [_hit()], text, 1.5, metrics)
 
-    assert row.faithfulness == pytest.approx(0.2)
-    assert row.groundedness == pytest.approx(0.4)
-    assert row.correctness == pytest.approx(0.6)
-    assert row.confidence == pytest.approx(0.7)
-    assert row.latency_seconds == pytest.approx(1.5)
-    assert row.required_phrases
-    assert row.cited_section
-    assert row.token_f1 == pytest.approx(1.0)
-    assert row.phrase_coverage == pytest.approx(1.0)
-    assert row.citation_recall == pytest.approx(1.0)
-    assert row.distractor_citation == pytest.approx(0.0)
-    assert row.abstain_contamination is None
-    case = metrics["correctness"].case
-    assert case.expected_output.startswith("2040")
-    assert "section_id: Carbon_New_2040#1" in case.retrieval_context[0]
-    assert "Sections used:" in case.actual_output
+    stored = measure_jev(case)
+
+    payload = jev_score_payload(case)
+    assert calls[0]["url"].endswith("/v1/systemone")
+    assert calls[0]["json"] == payload
+    assert calls[0]["headers"]["Authorization"] == "Bearer test-key"
+    assert set(payload["questions"]) == {"faithfulness", "groundedness", "correctness"}
+    for question in payload["questions"].values():
+        assert question["type"] == "choice"
+        assert set(question["criteria"]) == {"meets", "misses"}
+    assert stored["model"] == "jev-1.13.0"
+    assert stored["prompt_tokens"] == 20
+    assert stored["generation_tokens"] == 9
+    assert stored["answers"]["faithfulness"]["passed"] is True
+    assert stored["answers"]["correctness"]["choice"] == "misses"
+    assert stored["answers"]["correctness"]["passed"] is False
 
 
 def test_retry_runs_three_times_then_raises() -> None:
@@ -499,26 +448,83 @@ def test_answers_are_written_before_evals(tmp_path, monkeypatch: pytest.MonkeyPa
     assert stored["items"][0]["answer"] == "2040"
     assert stored["items"][0]["error"] is None
     assert stored["items"][0]["retrieved"][0]["section_id"] == "Carbon_New_2040#1"
+    assert stored["items"][0]["retrieval_jev"] == {
+        "latency_seconds": None,
+        "generation_tokens": None,
+    }
 
     def fail_generate(prompt: str) -> str:
         raise AssertionError("evals must not generate")
 
     monkeypatch.setattr("src.eval_generation.generate", fail_generate)
     monkeypatch.setattr(
-        "src.eval_generation.geval_metrics",
-        lambda model=None: {
-            "faithfulness": _Metric(0.2),
-            "groundedness": _Metric(0.4),
-            "correctness": _Metric(0.6),
+        "src.eval_generation.measure_jev",
+        lambda test_case: {
+            "model": "jev-1.13.0",
+            "latency_seconds": 0.4,
+            "prompt_tokens": 12,
+            "generation_tokens": 6,
+            "answers": {
+                "faithfulness": {"choice": "meets", "passed": True, "confidence": 1.0, "probabilities": {"meets": 1.0}},
+                "groundedness": {"choice": "meets", "passed": True, "confidence": 1.0, "probabilities": {"meets": 1.0}},
+                "correctness": {"choice": "misses", "passed": False, "confidence": 0.6, "probabilities": {"misses": 0.6}},
+            },
         },
     )
-    evals = tmp_path / "evals.json"
-    result = score_answers(answers, evals)
-    saved = json.loads(evals.read_text(encoding="utf-8"))
+    jev_path = tmp_path / "evals_jev.json"
+    written = score_answers(answers, jev_path)
+    jev_saved = json.loads(jev_path.read_text(encoding="utf-8"))
 
-    assert result is not None
-    assert result.faithfulness == pytest.approx(0.2)
-    assert saved["judge"] == "gpt-oss:20b"
-    assert saved["items"][0]["correctness"] == pytest.approx(0.6)
-    assert saved["items"][0]["required_phrases"] is True
-    assert saved["items"][0]["cited_section"] is True
+    assert written == jev_path
+    assert jev_saved["judge"] == "jev-latest"
+    assert jev_saved["items"][0]["latency_seconds"] == pytest.approx(0.4)
+    assert jev_saved["items"][0]["generation_tokens"] == 6
+    assert jev_saved["items"][0]["correctness"]["passed"] is False
+
+
+def test_answer_stores_the_jev_call_after_the_cross_encoder(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    gold = tmp_path / "gold.json"
+    gold.write_text(json.dumps({"items": [_item()]}), encoding="utf-8")
+    monkeypatch.setattr("src.eval_generation.GOLD_PATH", gold)
+
+    def search(client: object, question: str, k: int) -> list[HybridHit]:
+        del client, question, k
+        return [_hit()]
+
+    search.last_jev = {"latency_ms": 1500, "generation_tokens": 18, "prompt_tokens": 40}
+
+    class _Client:
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr("src.eval_generation.hybrid_search", search)
+    monkeypatch.setattr("src.eval_generation.connect", lambda: _Client())
+    monkeypatch.setattr(
+        "src.eval_generation.generate",
+        lambda prompt: '{"answer": "2040", "sections": [], "confidence": 0.4}',
+    )
+
+    stored = json.loads(generate_answers(tmp_path / "answers.json").read_text(encoding="utf-8"))
+
+    assert stored["items"][0]["retrieval_jev"] == {
+        "latency_seconds": pytest.approx(1.5),
+        "generation_tokens": 18,
+    }
+
+
+def test_stored_answers_cite_the_gold_section() -> None:
+    gold = json.loads(GOLD_PATH.read_text(encoding="utf-8"))
+    stored = json.loads(ANSWERS_PATH.read_text(encoding="utf-8"))
+    answers = {item["id"]: item for item in stored["items"]}
+
+    assert [item["id"] for item in gold["items"]] == list(answers)
+
+    for item in gold["items"]:
+        record = answers[item["id"]]
+        parsed = parse_generation(str(record["raw"]))
+        assert cited_section(parsed, item)
+        assert required_phrases(parsed.answer, item)
+        if item["abstain"]:
+            assert citation_recall(parsed, item) is None
+        else:
+            assert citation_recall(parsed, item) == pytest.approx(1.0)

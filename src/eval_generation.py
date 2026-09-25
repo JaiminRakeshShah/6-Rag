@@ -1,23 +1,23 @@
 """Generation evals for the golden question set.
 
 Answers are generated first and written to ``data/generation/answers.json``.
-Evals then read that file and write one row per question to
-``data/generation/evals.json``. The prompt asks the generator to name the
-sections it used, with the same ``section_id`` and ``section_name`` fields
-the gold file stores, and to give a confidence from 0 to 1. Generation
-latency is the wait for that call only.
+Jev Choice then scores faithfulness, groundedness, and correctness into
+``data/generation/evals_jev.json``. Recorded gpt-oss judge scores stay in
+``data/generation/evals_gptoss.json`` and ``data/generation/evals.json``.
+This module does not call gpt-oss.
 
-DeepEval GEval, judged by ``gptoss`` (``gpt-oss:20b``), scores
-faithfulness, groundedness, and correctness. Temperature is 0. ``top_k``
-and ``top_p`` are left unset. Deterministic scores sit beside the judge:
-phrase coverage, citation recall, distractor citation, token F1 against
-``expected_answer``, and abstain contamination. The two pass/fail checks
-remain: every ``answer_must_include`` phrase is present, and a cited
-section matches a gold supporting section.
+The prompt asks the generator to name the sections it used, with the same
+``section_id`` and ``section_name`` fields the gold file stores, and to give
+a confidence from 0 to 1. Generation latency is the wait for that call only.
 
-The generator call and the three judge calls each retry up to ``ATTEMPTS``
-times. A question that still fails is stored with ``error`` set, and the
-run continues.
+Deterministic checks remain: phrase coverage, citation recall, distractor
+citation, token F1 against ``expected_answer``, and abstain contamination.
+The two pass/fail checks are that every ``answer_must_include`` phrase is
+present, and that a cited section matches a gold supporting section.
+
+The generator call and the Jev call each retry up to ``ATTEMPTS`` times.
+A question that still fails is stored with ``error`` set, and the run
+continues.
 """
 
 import json
@@ -30,13 +30,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
-from deepeval.metrics import GEval
-from deepeval.models import DeepEvalBaseLLM
+from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase, SingleTurnParams
 
 from src import config
-from src.generate import generate
-from src.retrieve import INITIAL_K, HybridHit, hybrid_search
+from src.generate import generate, generation_prompt
+from src.retrieve import INITIAL_K, TYPESAFE_URL, HybridHit, hybrid_search
 from src.vectordb import connect
 
 K = INITIAL_K
@@ -66,9 +65,33 @@ _DECLINE_TOKENS = frozenset(
 ROOT = Path(__file__).resolve().parents[1]
 GOLD_PATH = ROOT / "data" / "gold" / "policy_rag_golden.json"
 ANSWERS_PATH = ROOT / "data" / "generation" / "answers.json"
-EVALS_PATH = ROOT / "data" / "generation" / "evals.json"
-_DEFAULT_BASE_URL = "http://host.docker.internal:11434"
+JEV_EVALS_PATH = ROOT / "data" / "generation" / "evals_jev.json"
 _JUDGE_NAMES = ("faithfulness", "groundedness", "correctness")
+_JEV_MODEL = "jev-latest"
+_JEV_PASS = "meets"
+_JEV_CRITERIA: dict[str, tuple[str, dict[str, str]]] = {
+    "faithfulness": (
+        "Do the factual claims in the answer agree with the retrieval context?",
+        {
+            "meets": "Every factual claim in the answer agrees with the retrieval context",
+            "misses": "A factual claim in the answer contradicts the retrieval context",
+        },
+    ),
+    "groundedness": (
+        "Is every fact in the answer stated in the retrieval context?",
+        {
+            "meets": "Every fact in the answer is stated in the retrieval context",
+            "misses": "The answer states a fact the retrieval context does not contain",
+        },
+    ),
+    "correctness": (
+        "Does the answer include the facts required by the expected output?",
+        {
+            "meets": "The answer includes every fact required by the expected output",
+            "misses": "A fact required by the expected output is missing, or the answer states a figure or a name when the expected output says the documents do not contain the answer",
+        },
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -144,39 +167,6 @@ class GenerationEval:
     abstain_questions: int = 0
     confidence_passed_questions: int = 0
     confidence_failed_questions: int = 0
-
-
-def generation_prompt(question: str, hits: Sequence[HybridHit]) -> str:
-    """Ask for an answer, the sections used, and a confidence."""
-    blocks: list[str] = []
-    for hit in hits:
-        blocks.append(
-            "\n".join(
-                (
-                    f"chunk_id: {hit.chunk_id}",
-                    f"section_id: {hit.parent_id}",
-                    f"section_name: {hit.section_name}",
-                    f"filename: {hit.filename}",
-                    "body:",
-                    hit.body,
-                )
-            )
-        )
-    chunks = "\n\n".join(blocks) if blocks else "(no chunks retrieved)"
-    return (
-        "Answer the question using only the retrieved chunks. "
-        "If they do not contain the answer, say the documents do not say, "
-        "and do not invent a figure or a name.\n"
-        "Name every section you used. Copy section_id and section_name "
-        "exactly as they are written on the chunk. Those are the same "
-        "fields a gold supporting section records.\n"
-        "Reply with one JSON object and no other text:\n"
-        '{"answer": "...", "sections": [{"section_id": "...", "section_name": "..."}], '
-        '"confidence": 0.0}\n'
-        "confidence is a number from 0 to 1.\n\n"
-        f"Question: {question}\n\n"
-        f"Chunks:\n{chunks}\n"
-    )
 
 
 def parse_generation(text: str) -> Generation:
@@ -416,99 +406,120 @@ def context_block(hit: HybridHit) -> str:
     )
 
 
-class OllamaJudge(DeepEvalBaseLLM):
-    """GEval judge that posts to the host Ollama server over HTTP.
+class JevScoreJudge(BaseMetric):
+    """Three Choice questions in one Jev request.
 
-    Same call as the generator: ``POST {OLLAMA_BASE_URL}/api/generate``,
-    stream off, temperature 0. ``top_k`` and ``top_p`` are not sent.
-    ``think`` is off so ``gpt-oss`` writes the score into ``response``.
-    A JSON schema in ``format`` makes that field come back empty, so the
-    schema DeepEval passes is not forwarded.
+    Each question has two options, ``meets`` and ``misses``. ``passed`` is true
+    when Jev chooses ``meets``.
     """
 
-    def __init__(self, model_id: str) -> None:
-        self.temperature = 0
-        super().__init__(model_id)
+    _required_params = [
+        SingleTurnParams.INPUT,
+        SingleTurnParams.ACTUAL_OUTPUT,
+        SingleTurnParams.EXPECTED_OUTPUT,
+        SingleTurnParams.RETRIEVAL_CONTEXT,
+    ]
+    async_mode = False
+    evaluation_model = _JEV_MODEL
 
-    def load_model(self) -> str:
-        return self.name
+    def __init__(self) -> None:
+        self.threshold = 0.5
+        self.stored_result: dict[str, object] = {}
 
-    def generate(self, prompt: str, schema: type | None = None) -> str:
-        del schema
-        base_url = os.getenv("OLLAMA_BASE_URL", _DEFAULT_BASE_URL).rstrip("/")
-        response = httpx.post(
-            f"{base_url}/api/generate",
-            json={
-                "model": self.name,
-                "prompt": prompt,
-                "stream": False,
-                "think": False,
-                "options": {"temperature": self.temperature},
-            },
-            timeout=180.0,
-        )
-        response.raise_for_status()
-        return _judge_text(response.json())
+    def measure(self, test_case: LLMTestCase, *args: object, **kwargs: object) -> float:
+        del args, kwargs
+        result = _jev_score_once(test_case)
+        self.stored_result = result
+        self.input_tokens = _optional_int(result.get("prompt_tokens"))
+        self.output_tokens = _optional_int(result.get("generation_tokens"))
+        answers = result["answers"]
+        if not isinstance(answers, Mapping):
+            raise ValueError("Jev choice result has no answers")
+        passes = [1.0 if answers[name]["passed"] is True else 0.0 for name in _JUDGE_NAMES]
+        self.score = sum(passes) / len(passes)
+        self.reason = None
+        self.success = self.score >= self.threshold
+        return self.score
 
-    async def a_generate(self, prompt: str, schema: type | None = None) -> str:
-        return self.generate(prompt, schema=schema)
-
-    def get_model_name(self) -> str:
-        return self.name
-
-
-def judge_model() -> OllamaJudge:
-    """GEval judge. The model is ``gptoss``, temperature 0."""
-    return OllamaJudge(config.MODELS["gptoss"])
+    async def a_measure(self, test_case: LLMTestCase, *args: object, **kwargs: object) -> float:
+        return self.measure(test_case, *args, **kwargs)
 
 
-def geval_metrics(model: OllamaJudge | None = None) -> dict[str, GEval]:
-    """Faithfulness, groundedness, and correctness, each a GEval metric."""
-    judge = judge_model() if model is None else model
+def jev_score_payload(test_case: LLMTestCase) -> dict[str, object]:
+    """One System One request. The three Choice questions share the test case."""
+    questions: dict[str, object] = {}
+    for name, (instructions, criteria) in _JEV_CRITERIA.items():
+        questions[name] = {
+            "type": "choice",
+            "instructions": instructions,
+            "criteria": criteria,
+        }
     return {
-        "faithfulness": GEval(
-            name="Faithfulness",
-            evaluation_steps=[
-                "Extract the factual claims in the actual output.",
-                "Check each claim against the retrieval context.",
-                "Score lower when a claim contradicts the retrieval context.",
-            ],
-            evaluation_params=[
-                SingleTurnParams.ACTUAL_OUTPUT,
-                SingleTurnParams.RETRIEVAL_CONTEXT,
-            ],
-            model=judge,
-            async_mode=False,
-        ),
-        "groundedness": GEval(
-            name="Groundedness",
-            evaluation_steps=[
-                "Extract the factual claims in the actual output.",
-                "Mark a claim as grounded only when the retrieval context states it.",
-                "Score lower when a claim is not stated in the retrieval context, "
-                "even if it does not contradict that context.",
-            ],
-            evaluation_params=[
-                SingleTurnParams.ACTUAL_OUTPUT,
-                SingleTurnParams.RETRIEVAL_CONTEXT,
-            ],
-            model=judge,
-            async_mode=False,
-        ),
-        "correctness": GEval(
-            name="Correctness",
-            evaluation_steps=[
-                "Compare the facts in the actual output with the expected output.",
-                "Score lower when a fact required by the expected output is missing.",
-                "When the expected output says the documents do not contain the answer, score lower if the actual output states a figure or a name as fact.",
-            ],
-            evaluation_params=[
-                SingleTurnParams.ACTUAL_OUTPUT,
-                SingleTurnParams.EXPECTED_OUTPUT,
-            ],
-            model=judge,
-            async_mode=False,
-        ),
+        "model": _JEV_MODEL,
+        "state": {
+            "question": test_case.input,
+            "actual_output": test_case.actual_output,
+            "expected_output": test_case.expected_output,
+            "retrieval_context": test_case.retrieval_context,
+        },
+        "questions": questions,
+    }
+
+
+def measure_jev(test_case: LLMTestCase) -> dict[str, object]:
+    """Score one test case with Jev. Retries the request, then raises."""
+    metric = JevScoreJudge()
+
+    def once() -> dict[str, object]:
+        metric.measure(test_case)
+        return metric.stored_result
+
+    return call_with_retry(once)
+
+
+def _jev_score_once(test_case: LLMTestCase) -> dict[str, object]:
+    """Post the Choice request and read which option Jev picked."""
+    api_key = os.getenv("TYPESAFE_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("TYPESAFE_API_KEY is required to score with Jev")
+    started = time.perf_counter()
+    response = httpx.post(
+        TYPESAFE_URL,
+        json=jev_score_payload(test_case),
+        headers={"Authorization": f"Bearer {api_key}"},
+        timeout=60.0,
+    )
+    latency_seconds = time.perf_counter() - started
+    response.raise_for_status()
+    body = response.json()
+    usage = body.get("usage") or {}
+    raw_answers = body.get("answers")
+    if not isinstance(raw_answers, Mapping):
+        raise ValueError("Jev choice response has no answers")
+    answers: dict[str, object] = {}
+    for name in _JEV_CRITERIA:
+        answer = raw_answers.get(name)
+        if not isinstance(answer, Mapping) or answer.get("type") != "choice":
+            raise ValueError(f"Jev choice response has no {name} choice")
+        choice = answer.get("choice")
+        if not isinstance(choice, str):
+            raise ValueError(f"Jev {name} choice is missing")
+        probabilities = answer.get("probabilities") or {}
+        if not isinstance(probabilities, Mapping):
+            raise ValueError(f"Jev {name} choice has no probabilities")
+        confidence = answer.get("confidence")
+        answers[name] = {
+            "choice": choice,
+            "passed": choice == _JEV_PASS,
+            "confidence": float(confidence) if isinstance(confidence, (int, float)) else None,
+            "probabilities": {str(key): float(value) for key, value in probabilities.items()},
+        }
+    return {
+        "model": body.get("model") or _JEV_MODEL,
+        "latency_seconds": latency_seconds,
+        "prompt_tokens": usage.get("input_tokens"),
+        "generation_tokens": usage.get("output_tokens"),
+        "answers": answers,
     }
 
 
@@ -523,84 +534,6 @@ def call_with_retry(fn):
             if attempt == ATTEMPTS:
                 raise
     raise last
-
-
-def score_item(
-    item: Mapping[str, object],
-    hits: Sequence[HybridHit],
-    text: str,
-    latency_seconds: float,
-    metrics: Mapping[str, GEval],
-) -> QuestionScore:
-    """Score one generated reply with the judge and the two checks."""
-    record, row = eval_record(item, hits, text, latency_seconds, metrics)
-    if row is None:
-        raise ValueError(record["error"])
-    return row
-
-
-def eval_record(
-    item: Mapping[str, object],
-    hits: Sequence[HybridHit],
-    text: str,
-    latency_seconds: float,
-    metrics: Mapping[str, GEval],
-) -> tuple[dict[str, object], QuestionScore | None]:
-    """Judge one stored answer. A failed metric is retried, then left empty."""
-    parsed = parse_generation(text)
-    test_case = LLMTestCase(
-        input=str(item["question"]),
-        actual_output=actual_output(parsed),
-        expected_output=expected_output(item),
-        retrieval_context=[context_block(hit) for hit in hits],
-    )
-    item_id = item["id"]
-    if not isinstance(item_id, str):
-        raise ValueError("id must be a string")
-    record: dict[str, object] = {
-        "id": item_id,
-        "confidence": parsed.confidence,
-        "latency_seconds": latency_seconds,
-        "required_phrases": required_phrases(parsed.answer, item),
-        "cited_section": cited_section(parsed, item),
-        "token_f1": _token_f1_for(parsed.answer, item),
-        "phrase_coverage": phrase_coverage(parsed.answer, item),
-        "citation_recall": citation_recall(parsed, item),
-        "distractor_citation": distractor_citation(parsed, item),
-        "abstain_contamination": abstain_contamination(parsed.answer, item),
-        "error": None,
-    }
-    scores: dict[str, float] = {}
-    for name in _JUDGE_NAMES:
-        try:
-            score, reason = _measure(metrics[name], test_case)
-        except Exception as exc:
-            record[name] = None
-            record[f"{name}_reason"] = None
-            message = f"{name}: {exc}"
-            record["error"] = message if record["error"] is None else f"{record['error']}; {message}"
-            continue
-        scores[name] = score
-        record[name] = score
-        record[f"{name}_reason"] = reason
-    if len(scores) != len(_JUDGE_NAMES):
-        return record, None
-    row = QuestionScore(
-        item_id=item_id,
-        faithfulness=scores["faithfulness"],
-        groundedness=scores["groundedness"],
-        correctness=scores["correctness"],
-        confidence=parsed.confidence,
-        latency_seconds=latency_seconds,
-        required_phrases=bool(record["required_phrases"]),
-        cited_section=bool(record["cited_section"]),
-        token_f1=_optional_float(record["token_f1"]),
-        phrase_coverage=_optional_float(record["phrase_coverage"]),
-        citation_recall=_optional_float(record["citation_recall"]),
-        distractor_citation=float(record["distractor_citation"]),
-        abstain_contamination=_optional_bool(record["abstain_contamination"]),
-    )
-    return record, row
 
 
 def generate_answers(path: Path = ANSWERS_PATH, k: int = K) -> Path:
@@ -625,6 +558,7 @@ def generate_answers(path: Path = ANSWERS_PATH, k: int = K) -> Path:
                     ],
                     "confidence": parsed.confidence,
                     "latency_seconds": latency,
+                    "retrieval_jev": _retrieval_jev(hybrid_search),
                     "retrieved": [_stored_hit(hit) for hit in hits],
                     "error": error,
                 }
@@ -646,40 +580,37 @@ def generate_answers(path: Path = ANSWERS_PATH, k: int = K) -> Path:
     return path
 
 
-def score_answers(answers_path: Path = ANSWERS_PATH, evals_path: Path = EVALS_PATH) -> GenerationEval | None:
-    """Score the stored answers and write one eval row per question."""
+def score_answers(
+    answers_path: Path = ANSWERS_PATH,
+    jev_path: Path = JEV_EVALS_PATH,
+) -> Path:
+    """Judge the stored answers with Jev Choice. gpt-oss is not called."""
     stored = json.loads(answers_path.read_text(encoding="utf-8"))
     dataset = json.loads(GOLD_PATH.read_text(encoding="utf-8"))
     gold = {item["id"]: item for item in dataset["items"]}
-    metrics = geval_metrics()
-    eval_items: list[dict[str, object]] = []
-    scored: list[QuestionScore] = []
+    jev_items: list[dict[str, object]] = []
     for record in stored["items"]:
         item = gold[record["id"]]
         if record.get("error"):
-            row_record, row = _failed_eval(record), None
+            result: dict[str, object] = {"error": record["error"]}
         else:
             hits = [_hit_from_stored(hit) for hit in record["retrieved"]]
-            row_record, row = eval_record(
-                item,
-                hits,
-                str(record["raw"]),
-                float(record["latency_seconds"]),
-                metrics,
+            parsed = parse_generation(str(record["raw"]))
+            test_case = LLMTestCase(
+                input=str(item["question"]),
+                actual_output=actual_output(parsed),
+                expected_output=expected_output(item),
+                retrieval_context=[context_block(hit) for hit in hits],
             )
-        eval_items.append(row_record)
-        if row is not None:
-            scored.append(row)
-            _print_row(row)
-        else:
-            print(f"{record['id']} eval failed: {row_record['error']}")
-        _write_json(
-            evals_path,
-            {"judge": config.MODELS["gptoss"], "items": eval_items},
-        )
-    if not scored:
-        return None
-    return evaluate(scored)
+            try:
+                result = measure_jev(test_case)
+            except Exception as exc:
+                result = {"error": str(exc)}
+        row = _jev_score_row({"id": record["id"], "jev": result})
+        jev_items.append(row)
+        _write_json(jev_path, {"judge": _JEV_MODEL, "items": jev_items})
+        _print_jev({"id": record["id"], "jev": result})
+    return jev_path
 
 
 def evaluate(rows: Sequence[QuestionScore]) -> GenerationEval:
@@ -731,13 +662,10 @@ def evaluate(rows: Sequence[QuestionScore]) -> GenerationEval:
     )
 
 
-def run_golden(k: int = K) -> GenerationEval:
-    """Write every answer, then score that file."""
+def run_golden(k: int = K) -> Path:
+    """Write every answer, then score that file with Jev."""
     generate_answers(k=k)
-    result = score_answers()
-    if result is None:
-        raise ValueError("no scored questions")
-    return result
+    return score_answers()
 
 
 def _generate_once(
@@ -753,35 +681,65 @@ def _generate_once(
     return text, time.perf_counter() - started, None
 
 
-def _measure(metric: GEval, test_case: LLMTestCase) -> tuple[float, str]:
-    """Run one judge metric, retrying the model call."""
+def _print_jev(record: Mapping[str, object]) -> None:
+    """Print the Jev Score choices for one question."""
+    jev = record.get("jev")
+    item_id = record["id"]
+    if not isinstance(jev, Mapping):
+        print(f"{item_id} jev skipped")
+        return
+    if jev.get("error"):
+        print(f"{item_id} jev failed: {jev['error']}")
+        return
+    answers = jev.get("answers")
+    if not isinstance(answers, Mapping):
+        print(f"{item_id} jev failed: no answers")
+        return
+    parts = [
+        f"{name}={answers[name].get('choice')}"
+        for name in _JUDGE_NAMES
+        if isinstance(answers.get(name), Mapping)
+    ]
+    latency = jev.get("latency_seconds")
+    latency_text = f"{float(latency):.4f}" if isinstance(latency, (int, float)) else "none"
+    print(
+        f"{item_id} jev {' '.join(parts)} "
+        f"latency_seconds={latency_text} "
+        f"prompt_tokens={jev.get('prompt_tokens')} "
+        f"generation_tokens={jev.get('generation_tokens')}"
+    )
 
-    def once() -> tuple[float, str]:
-        metric.measure(test_case, _show_indicator=False)
-        reason = getattr(metric, "reason", "")
-        return float(metric.score), "" if reason is None else str(reason)
 
-    return call_with_retry(once)
+def _retrieval_jev(search: object) -> dict[str, object]:
+    """Latency and generation tokens from the Jev call after the cross-encoder."""
+    result = getattr(search, "last_jev", None)
+    if not isinstance(result, Mapping):
+        return {"latency_seconds": None, "generation_tokens": None}
+    latency_ms = result.get("latency_ms")
+    tokens = result.get("generation_tokens")
+    latency = float(latency_ms) / 1000 if isinstance(latency_ms, (int, float)) else None
+    generation = tokens if isinstance(tokens, int) else None
+    return {"latency_seconds": latency, "generation_tokens": generation}
 
 
-def _failed_eval(record: Mapping[str, object]) -> dict[str, object]:
-    """Eval row for an answer that was not generated."""
-    row: dict[str, object] = {
-        "id": record["id"],
-        "confidence": None,
-        "latency_seconds": record.get("latency_seconds"),
-        "required_phrases": False,
-        "cited_section": False,
-        "token_f1": None,
-        "phrase_coverage": None,
-        "citation_recall": None,
-        "distractor_citation": 0.0,
-        "abstain_contamination": None,
-        "error": record.get("error"),
-    }
+def _jev_score_row(record: Mapping[str, object]) -> dict[str, object]:
+    """One Jev Choice row: latency, generation tokens, and the three answers."""
+    row: dict[str, object] = {"id": record["id"]}
+    jev = record.get("jev")
+    if not isinstance(jev, Mapping):
+        row["latency_seconds"] = None
+        row["generation_tokens"] = None
+        row["error"] = None
+        for name in _JUDGE_NAMES:
+            row[name] = None
+        return row
+    row["latency_seconds"] = jev.get("latency_seconds")
+    row["generation_tokens"] = jev.get("generation_tokens")
+    row["error"] = jev.get("error")
+    answers = jev.get("answers")
+    answers = answers if isinstance(answers, Mapping) else {}
     for name in _JUDGE_NAMES:
-        row[name] = None
-        row[f"{name}_reason"] = None
+        row[name] = answers.get(name)
     return row
 
 
@@ -820,44 +778,6 @@ def _write_json(path: Path, payload: Mapping[str, object]) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def _print_row(row: QuestionScore) -> None:
-    confidence = "none" if row.confidence is None else f"{row.confidence:.4f}"
-    print(
-        f"{row.item_id} faithfulness={row.faithfulness:.4f} "
-        f"groundedness={row.groundedness:.4f} correctness={row.correctness:.4f} "
-        f"confidence={confidence} latency_seconds={row.latency_seconds:.4f} "
-        f"required_phrases={int(row.required_phrases)} cited_section={int(row.cited_section)} "
-        f"token_f1={_format_optional(row.token_f1)} "
-        f"phrase_coverage={_format_optional(row.phrase_coverage)} "
-        f"citation_recall={_format_optional(row.citation_recall)} "
-        f"distractor_citation={row.distractor_citation:.4f} "
-        f"abstain_contamination={row.abstain_contamination}"
-    )
-
-
-def _judge_text(payload: Mapping[str, object]) -> str:
-    """Return the score JSON, or raise with the text Ollama actually sent."""
-    response = payload.get("response")
-    thinking = payload.get("thinking")
-    text = response if isinstance(response, str) else ""
-    if "{" not in text and isinstance(thinking, str):
-        text = thinking
-    start = text.find("{")
-    end = text.rfind("}")
-    snippet = text[start : end + 1] if start >= 0 and end > start else ""
-    if not snippet:
-        preview = text.strip().replace("\n", " ")[:180]
-        raise ValueError(
-            f"Ollama returned no JSON score (done_reason={payload.get('done_reason')!s}). {preview}"
-        )
-    try:
-        json.loads(snippet)
-    except json.JSONDecodeError as exc:
-        preview = snippet.replace("\n", " ")[:180]
-        raise ValueError(f"Ollama judge returned invalid JSON ({exc.msg}). {preview}") from exc
-    return snippet
-
-
 def _json_object(text: str) -> dict[str, object] | None:
     start = text.find("{")
     end = text.rfind("}")
@@ -877,28 +797,11 @@ def _tokens(text: str) -> list[str]:
     return re.findall(r"[a-z0-9]+", text.casefold())
 
 
-def _token_f1_for(answer: str, item: Mapping[str, object]) -> float | None:
-    """Token F1 against ``expected_answer``. Abstain and missing answers are excluded."""
-    expected = item.get("expected_answer")
-    if not isinstance(expected, str):
+def _optional_int(value: object) -> int | None:
+    """Return ``value`` as an int when the usage field is a number."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    return token_f1(answer, expected)
-
-
-def _optional_float(value: object) -> float | None:
-    """Return ``value`` as a float, or ``None`` when the score does not apply."""
-    if value is None or isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    return None
-
-
-def _optional_bool(value: object) -> bool | None:
-    """Return ``value`` when it is a bool, otherwise ``None``."""
-    if isinstance(value, bool):
-        return value
-    return None
+    return int(value)
 
 
 def _average(values: Sequence[float]) -> tuple[float, int]:
@@ -906,13 +809,6 @@ def _average(values: Sequence[float]) -> tuple[float, int]:
     if not values:
         return 0.0, 0
     return sum(values) / len(values), len(values)
-
-
-def _format_optional(value: float | None) -> str:
-    """Print a missing score as ``none``."""
-    if value is None:
-        return "none"
-    return f"{value:.4f}"
 
 
 def _confidence(value: object) -> float | None:
@@ -966,37 +862,13 @@ def _evidence_quotes(value: object) -> list[str]:
 
 
 def main() -> None:
-    """Write answers.json, then evals.json, and print the means."""
+    """Write answers.json, then the Jev judge file."""
     generate_answers()
     print(f"answers: {ANSWERS_PATH}")
-    result = score_answers()
-    print(f"evals: {EVALS_PATH}")
-    if result is None:
-        print("no scored questions")
-        return
+    score_answers()
+    print(f"jev evals: {JEV_EVALS_PATH}")
     print(f"generator: {config.MODEL} ({config.MODELS[config.MODEL]})")
-    print(f"judge: {config.MODELS['gptoss']}")
-    print(f"questions: {result.questions}")
-    print(f"faithfulness: {result.faithfulness:.4f}")
-    print(f"groundedness: {result.groundedness:.4f}")
-    print(f"correctness: {result.correctness:.4f}")
-    print(f"confidence: {result.confidence:.4f} ({result.confidence_questions} reported)")
-    print(f"latency_seconds: {result.latency_seconds:.4f}")
-    print(f"required_phrases: {result.required_phrases:.4f}")
-    print(f"cited_section: {result.cited_section:.4f}")
-    print(f"token_f1: {result.token_f1:.4f} ({result.token_f1_questions} questions)")
-    print(f"phrase_coverage: {result.phrase_coverage:.4f} ({result.phrase_coverage_questions} questions)")
-    print(f"citation_recall: {result.citation_recall:.4f} ({result.citation_recall_questions} questions)")
-    print(f"distractor_citation: {result.distractor_citation:.4f}")
-    print(f"abstain_contamination: {result.abstain_contamination:.4f} ({result.abstain_questions} questions)")
-    print(
-        f"confidence_when_passed: {result.confidence_when_passed:.4f} "
-        f"({result.confidence_passed_questions} questions)"
-    )
-    print(
-        f"confidence_when_failed: {result.confidence_when_failed:.4f} "
-        f"({result.confidence_failed_questions} questions)"
-    )
+    print(f"jev_judge: {_JEV_MODEL}")
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ import pytest
 
 from src.chunking import chunk_markdown
 from src.embed import EmbeddedChunk
-from src.retrieve import INITIAL_K, RRF_K, hybrid_search, reciprocal_rank_fusion
+from src.retrieve import INITIAL_K, JEV_KEEP, RRF_K, HybridHit, hybrid_search, reciprocal_rank_fusion
 from src.vectordb import bm25_scores, build_records, connect, replace_index
 
 
@@ -79,6 +79,22 @@ def test_rrf_sums_reciprocal_ranks() -> None:
     assert scores["terms"] > scores["scope"]
 
 
+def _mock_jev(
+    monkeypatch: pytest.MonkeyPatch,
+    probability,
+) -> list[list[HybridHit]]:
+    """Record the chunks sent to Jev and rank them with ``probability``."""
+    seen: list[list[HybridHit]] = []
+
+    def fake_jev(api_key: str, question: str, hits: list[HybridHit]) -> dict[str, object]:
+        seen.append(list(hits))
+        return {"probabilities": {hit.chunk_id: probability(hit) for hit in hits}}
+
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    monkeypatch.setattr("src.retrieve.call_jev", fake_jev)
+    return seen
+
+
 def test_cross_encoder_reranks_ahead_of_rrf(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -87,6 +103,10 @@ def test_cross_encoder_reranks_ahead_of_rrf(
     monkeypatch.setattr(
         "src.retrieve.cross_encoder_scores",
         lambda query, passages: [1.0 if "alpha zebra" in passage else 0.2 for passage in passages],
+    )
+    seen = _mock_jev(
+        monkeypatch,
+        lambda hit: 0.8 if hit.section_name == "Terms" else 0.2,
     )
     client, records = _index(
         tmp_path,
@@ -97,12 +117,17 @@ def test_cross_encoder_reranks_ahead_of_rrf(
 
     hits = hybrid_search(client, "carbon 2040", k=2)
 
-    assert [hit.section_name for hit in hits] == ["Scope", "Terms"]
-    assert hits[0].score == pytest.approx(1.0)
-    assert hits[1].score == pytest.approx(0.2)
-    assert hits[1].rrf_score > hits[0].rrf_score
-    assert hits[0].chunk_id == by_section["Scope"].chunk_id
-    assert hybrid_search(client, "carbon 2040", k=1)[0].section_name == "Scope"
+    assert [hit.section_name for hit in seen[0]] == ["Scope", "Terms"]
+    assert [hit.section_name for hit in hits] == ["Terms", "Scope"]
+    scope = next(hit for hit in hits if hit.section_name == "Scope")
+    terms = next(hit for hit in hits if hit.section_name == "Terms")
+    assert scope.score == pytest.approx(1.0)
+    assert terms.score == pytest.approx(0.2)
+    assert scope.probability == pytest.approx(0.2)
+    assert terms.probability == pytest.approx(0.8)
+    assert terms.rrf_score > scope.rrf_score
+    assert scope.chunk_id == by_section["Scope"].chunk_id
+    assert hybrid_search(client, "carbon 2040", k=1)[0].section_name == "Terms"
     client.close()
 
 
@@ -120,15 +145,21 @@ def test_initial_retrieval_keeps_ten_from_each_list(
     sections.append(("Extra", "quartz pebble."))
     vectors = [(math.cos(0.001 * index), math.sin(0.001 * index)) for index in range(INITIAL_K)]
     vectors.extend([(math.cos(1.2), math.sin(1.2)), (math.cos(2.0), math.sin(2.0))])
+    weights = {"Terms": 0.9, "Near 0": 0.8, "Near 1": 0.7}
+    seen = _mock_jev(monkeypatch, lambda hit: weights.get(hit.section_name, 0.01))
     client, _records = _index(tmp_path, sections, vectors)
 
     hits = hybrid_search(client, "carbon 2040", k=len(sections))
 
-    sections_found = {hit.section_name for hit in hits}
-    assert "Terms" in sections_found
-    assert "Extra" not in sections_found
-    assert len(hits) == INITIAL_K + 1
-    assert next(hit for hit in hits if hit.section_name == "Terms").body == "carbon 2040."
+    pool = {hit.section_name for hit in seen[0]}
+    assert "Terms" in pool
+    assert "Extra" not in pool
+    assert len(seen[0]) == INITIAL_K + 1
+    assert next(hit for hit in seen[0] if hit.section_name == "Terms").body == "carbon 2040."
+    assert len(hits) == JEV_KEEP
+    assert [hit.section_name for hit in hits] == ["Terms", "Near 0", "Near 1"]
+    assert hits[0].probability == pytest.approx(0.9)
+    assert hits[0].score == pytest.approx(0.0)
     client.close()
 
 

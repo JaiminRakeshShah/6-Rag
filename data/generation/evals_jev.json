@@ -1,0 +1,500 @@
+{
+  "judge": "jev-latest",
+  "items": [
+    {
+      "id": "gold-001",
+      "latency_seconds": 0.3808407918550074,
+      "generation_tokens": 105,
+      "error": null,
+      "faithfulness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 1.0,
+        "probabilities": {
+          "meets": 1.0,
+          "misses": 0.0
+        }
+      },
+      "groundedness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.93,
+        "probabilities": {
+          "meets": 0.97,
+          "misses": 0.03
+        }
+      },
+      "correctness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 1.0,
+        "probabilities": {
+          "meets": 1.0,
+          "misses": 0.0
+        }
+      }
+    },
+    {
+      "id": "gold-002",
+      "latency_seconds": 0.31283324980176985,
+      "generation_tokens": 105,
+      "error": null,
+      "faithfulness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.95,
+        "probabilities": {
+          "meets": 0.97,
+          "misses": 0.03
+        }
+      },
+      "groundedness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.77,
+        "probabilities": {
+          "meets": 0.89,
+          "misses": 0.11
+        }
+      },
+      "correctness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.99,
+        "probabilities": {
+          "meets": 0.99,
+          "misses": 0.01
+        }
+      }
+    },
+    {
+      "id": "gold-004",
+      "latency_seconds": 0.3193910839036107,
+      "generation_tokens": 105,
+      "error": null,
+      "faithfulness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.87,
+        "probabilities": {
+          "misses": 0.06,
+          "meets": 0.94
+        }
+      },
+      "groundedness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.88,
+        "probabilities": {
+          "misses": 0.06,
+          "meets": 0.94
+        }
+      },
+      "correctness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.97,
+        "probabilities": {
+          "misses": 0.02,
+          "meets": 0.98
+        }
+      }
+    },
+    {
+      "id": "gold-016",
+      "latency_seconds": 0.4147202088497579,
+      "generation_tokens": 105,
+      "error": null,
+      "faithfulness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 1.0,
+        "probabilities": {
+          "meets": 1.0,
+          "misses": 0.0
+        }
+      },
+      "groundedness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.93,
+        "probabilities": {
+          "meets": 0.97,
+          "misses": 0.03
+        }
+      },
+      "correctness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 1.0,
+        "probabilities": {
+          "meets": 1.0,
+          "misses": 0.0
+        }
+      }
+    },
+    {
+      "id": "gold-018",
+      "latency_seconds": 0.29682512511499226,
+      "generation_tokens": 105,
+      "error": null,
+      "faithfulness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 1.0,
+        "probabilities": {
+          "misses": 0.0,
+          "meets": 1.0
+        }
+      },
+      "groundedness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.93,
+        "probabilities": {
+          "misses": 0.03,
+          "meets": 0.97
+        }
+      },
+      "correctness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 1.0,
+        "probabilities": {
+          "misses": 0.0,
+          "meets": 1.0
+        }
+      }
+    },
+    {
+      "id": "gold-019",
+      "latency_seconds": 0.3497984579298645,
+      "generation_tokens": 105,
+      "error": null,
+      "faithfulness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.99,
+        "probabilities": {
+          "misses": 0.01,
+          "meets": 0.99
+        }
+      },
+      "groundedness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.96,
+        "probabilities": {
+          "misses": 0.02,
+          "meets": 0.98
+        }
+      },
+      "correctness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.98,
+        "probabilities": {
+          "misses": 0.01,
+          "meets": 0.99
+        }
+      }
+    },
+    {
+      "id": "gold-021",
+      "latency_seconds": 0.33489358401857316,
+      "generation_tokens": 105,
+      "error": null,
+      "faithfulness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 1.0,
+        "probabilities": {
+          "meets": 1.0,
+          "misses": 0.0
+        }
+      },
+      "groundedness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.96,
+        "probabilities": {
+          "meets": 0.98,
+          "misses": 0.02
+        }
+      },
+      "correctness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.99,
+        "probabilities": {
+          "meets": 1.0,
+          "misses": 0.0
+        }
+      }
+    },
+    {
+      "id": "gold-022",
+      "latency_seconds": 0.3474395831581205,
+      "generation_tokens": 105,
+      "error": null,
+      "faithfulness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.94,
+        "probabilities": {
+          "meets": 0.97,
+          "misses": 0.03
+        }
+      },
+      "groundedness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.85,
+        "probabilities": {
+          "meets": 0.93,
+          "misses": 0.07
+        }
+      },
+      "correctness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.91,
+        "probabilities": {
+          "meets": 0.96,
+          "misses": 0.04
+        }
+      }
+    },
+    {
+      "id": "gold-025",
+      "latency_seconds": 0.36680358299054205,
+      "generation_tokens": 105,
+      "error": null,
+      "faithfulness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 1.0,
+        "probabilities": {
+          "meets": 1.0,
+          "misses": 0.0
+        }
+      },
+      "groundedness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.93,
+        "probabilities": {
+          "meets": 0.97,
+          "misses": 0.03
+        }
+      },
+      "correctness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 1.0,
+        "probabilities": {
+          "meets": 1.0,
+          "misses": 0.0
+        }
+      }
+    },
+    {
+      "id": "gold-026",
+      "latency_seconds": 0.3637688329908997,
+      "generation_tokens": 105,
+      "error": null,
+      "faithfulness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.92,
+        "probabilities": {
+          "meets": 0.96,
+          "misses": 0.04
+        }
+      },
+      "groundedness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.81,
+        "probabilities": {
+          "meets": 0.91,
+          "misses": 0.09
+        }
+      },
+      "correctness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.93,
+        "probabilities": {
+          "meets": 0.96,
+          "misses": 0.04
+        }
+      }
+    },
+    {
+      "id": "gold-029",
+      "latency_seconds": 0.3644890000578016,
+      "generation_tokens": 105,
+      "error": null,
+      "faithfulness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 1.0,
+        "probabilities": {
+          "misses": 0.0,
+          "meets": 1.0
+        }
+      },
+      "groundedness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.97,
+        "probabilities": {
+          "misses": 0.01,
+          "meets": 0.99
+        }
+      },
+      "correctness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.89,
+        "probabilities": {
+          "misses": 0.05,
+          "meets": 0.95
+        }
+      }
+    },
+    {
+      "id": "gold-036",
+      "latency_seconds": 0.3187795418780297,
+      "generation_tokens": 105,
+      "error": null,
+      "faithfulness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 1.0,
+        "probabilities": {
+          "misses": 0.0,
+          "meets": 1.0
+        }
+      },
+      "groundedness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.98,
+        "probabilities": {
+          "misses": 0.01,
+          "meets": 0.99
+        }
+      },
+      "correctness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 1.0,
+        "probabilities": {
+          "misses": 0.0,
+          "meets": 1.0
+        }
+      }
+    },
+    {
+      "id": "gold-037",
+      "latency_seconds": 0.3152463750448078,
+      "generation_tokens": 105,
+      "error": null,
+      "faithfulness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.94,
+        "probabilities": {
+          "misses": 0.03,
+          "meets": 0.97
+        }
+      },
+      "groundedness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.93,
+        "probabilities": {
+          "misses": 0.04,
+          "meets": 0.96
+        }
+      },
+      "correctness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.92,
+        "probabilities": {
+          "misses": 0.04,
+          "meets": 0.96
+        }
+      }
+    },
+    {
+      "id": "gold-043",
+      "latency_seconds": 0.34826366719789803,
+      "generation_tokens": 105,
+      "error": null,
+      "faithfulness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 1.0,
+        "probabilities": {
+          "misses": 0.0,
+          "meets": 1.0
+        }
+      },
+      "groundedness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.97,
+        "probabilities": {
+          "misses": 0.01,
+          "meets": 0.99
+        }
+      },
+      "correctness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.98,
+        "probabilities": {
+          "misses": 0.01,
+          "meets": 0.99
+        }
+      }
+    },
+    {
+      "id": "gold-049",
+      "latency_seconds": 0.38976024999283254,
+      "generation_tokens": 105,
+      "error": null,
+      "faithfulness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 1.0,
+        "probabilities": {
+          "meets": 1.0,
+          "misses": 0.0
+        }
+      },
+      "groundedness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.95,
+        "probabilities": {
+          "meets": 0.98,
+          "misses": 0.02
+        }
+      },
+      "correctness": {
+        "choice": "meets",
+        "passed": true,
+        "confidence": 0.98,
+        "probabilities": {
+          "meets": 0.99,
+          "misses": 0.01
+        }
+      }
+    }
+  ]
+}
