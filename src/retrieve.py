@@ -1,4 +1,4 @@
-"""Hybrid retrieval: ten dense neighbors, ten BM25 hits, then RRF and a cross-encoder.
+"""Hybrid retrieval: ten dense neighbors, ten BM25 hits, then RRF, a cross-encoder, and Jev.
 
 Dense search and BM25 each contribute at most ``INITIAL_K`` chunks. Reciprocal
 rank fusion uses the usual constant of 60, with ranks starting at 1:
@@ -6,23 +6,35 @@ rank fusion uses the usual constant of 60, with ranks starting at 1:
     rrf_score(chunk) = sum(1 / (60 + rank))
 
 A chunk that is missing from a list adds nothing for that list. The fused
-chunks are then scored by a cross-encoder, and the top ``k`` of that ranking
-are returned. ``score`` is the cross-encoder score.
+chunks are scored by a cross-encoder. Every fused chunk is then one Choice
+option for Jev. Jev returns a probability for each option. The three highest
+probabilities are kept. ``score`` is the cross-encoder score. ``probability``
+is the Jev probability.
 """
 
+import json
 import os
-from collections.abc import Sequence
-from dataclasses import dataclass
+import time
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 
 from chromadb.api import ClientAPI
 from chromadb.errors import NotFoundError
 from fastembed.rerank.cross_encoder import TextCrossEncoder
+import requests
 
 from src.embed import embed_texts
 from src.vectordb import COLLECTION, SearchHit, bm25_scores, get_chunks, search
 
 INITIAL_K = 10
 RRF_K = 60
+JEV_KEEP = 3
+TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone"
+OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
+_JEV_INSTRUCTIONS = (
+    "Which chunk best answers the question? "
+    "Use superseded, document_date, and version when the question asks for the current or the archived copy."
+)
 _DEFAULT_RERANK_MODEL = "Xenova/ms-marco-MiniLM-L-6-v2"
 _cross_encoder_model: TextCrossEncoder | None = None
 
@@ -46,16 +58,21 @@ class HybridHit:
     body: str
     score: float
     rrf_score: float
+    probability: float = 0.0
 
 
 def hybrid_search(client: ClientAPI, query: str, k: int = 5) -> list[HybridHit]:
-    """Retrieve, fuse, and rerank chunks for ``query``.
+    """Retrieve, fuse, rerank, then keep the three chunks Jev rates highest.
 
     The embedding is the same Ollama call as the index. An empty store or a
-    blank query returns nothing and does not embed or rerank.
+    blank query returns nothing and does not embed, rerank, or call Jev.
+    ``k`` still has to be at least 1. The returned list is never longer than
+    ``JEV_KEEP``. ``hybrid_search.last_jev`` holds the latest Choice result,
+    including a probability for every chunk.
     """
     if k < 1:
         raise ValueError("k must be at least 1")
+    hybrid_search.last_jev = {}
     count = _indexed_count(client)
     if count == 0 or not query.strip():
         return []
@@ -83,10 +100,107 @@ def hybrid_search(client: ClientAPI, query: str, k: int = 5) -> list[HybridHit]:
             ranked_ids[index],
         ),
     )
-    return [
+    candidates = [
         _to_hybrid(by_id[ranked_ids[index]], rerank_scores[index], fused[ranked_ids[index]])
-        for index in order[:k]
+        for index in order
     ]
+    if not candidates:
+        return []
+    api_key = os.getenv("TYPESAFE_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("TYPESAFE_API_KEY is required to rank chunks with Jev")
+    result = call_jev(api_key, query, candidates)
+    hybrid_search.last_jev = result
+    return _top_probabilities(candidates, result["probabilities"], limit=min(k, JEV_KEEP))
+
+
+def jev_payload(question: str, hits: Sequence[HybridHit]) -> dict[str, object]:
+    """One Choice question whose options are the retrieved chunks."""
+    return {
+        "model": "jev-latest",
+        "state": {"question": question},
+        "questions": {
+            "action": {
+                "type": "choice",
+                "instructions": _JEV_INSTRUCTIONS,
+                "criteria": {hit.chunk_id: _chunk_criterion(hit) for hit in hits},
+            }
+        },
+    }
+
+
+def call_jev(api_key: str, question: str, hits: Sequence[HybridHit]) -> dict[str, object]:
+    """Ask Jev which chunk answers ``question``. Probabilities cover every chunk."""
+    started = time.perf_counter()
+    res = requests.post(
+        TYPESAFE_URL,
+        data=json.dumps(jev_payload(question, hits)).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        timeout=60,
+    )
+    latency_ms = (time.perf_counter() - started) * 1000
+    res.raise_for_status()
+    body = res.json()
+    answer = body["answers"]["action"]
+    usage = body.get("usage") or {}
+    probabilities = answer.get("probabilities") or {}
+    if not isinstance(probabilities, dict):
+        raise ValueError("Jev choice answer has no probabilities")
+    return {
+        "router": "jev",
+        "output": "structured choice",
+        "tool": answer.get("choice"),
+        "raw": answer,
+        "probabilities": {str(key): float(value) for key, value in probabilities.items()},
+        "generation_tokens": usage.get("output_tokens"),
+        "prompt_tokens": usage.get("input_tokens"),
+        "latency_ms": latency_ms,
+    }
+
+
+def _top_probabilities(
+    hits: Sequence[HybridHit],
+    probabilities: Mapping[str, float],
+    limit: int,
+) -> list[HybridHit]:
+    """Highest Jev probability first. Ties keep the stronger cross-encoder score."""
+    ranked = sorted(
+        hits,
+        key=lambda hit: (-probabilities.get(hit.chunk_id, 0.0), -hit.score, hit.chunk_id),
+    )
+    return [
+        replace(hit, probability=float(probabilities.get(hit.chunk_id, 0.0)))
+        for hit in ranked[:limit]
+    ]
+
+
+def chunk_metadata(hit: HybridHit) -> dict[str, object]:
+    """Chunk fields the ranker needs. ``superseded`` is always set. Empty metadata is left out."""
+    fields: dict[str, object] = {
+        "section_id": hit.parent_id,
+        "section_name": hit.section_name,
+        "filename": hit.filename,
+        "superseded": hit.superseded,
+    }
+    if hit.title:
+        fields["title"] = hit.title
+    if hit.page_no is not None:
+        fields["page_no"] = hit.page_no
+    if hit.document_date is not None:
+        fields["document_date"] = hit.document_date
+    if hit.date_source is not None:
+        fields["date_source"] = hit.date_source
+    if hit.version is not None:
+        fields["version"] = hit.version
+    return fields
+
+
+def _chunk_criterion(hit: HybridHit) -> dict[str, object]:
+    """Description Jev sees for one chunk option."""
+    return {**chunk_metadata(hit), "body": hit.body}
 
 
 def reciprocal_rank_fusion(*rankings: Sequence[str]) -> dict[str, float]:
